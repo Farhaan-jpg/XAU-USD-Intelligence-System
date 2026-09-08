@@ -527,11 +527,16 @@ body {
   background: var(--bg-glass);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: var(--space-md);
+  padding: 12px 14px;
   transition: all var(--transition-base);
   position: relative;
-  overflow: hidden;
   animation: slideIn 0.4s ease;
+  flex-shrink: 0 !important;
+  min-height: auto !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
 }
 
 .news-item::before {
@@ -625,11 +630,14 @@ body {
 }
 
 .news-item-title {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--text-primary);
-  line-height: 1.4;
+  line-height: 1.45;
   flex: 1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .news-item-reasoning {
@@ -1254,9 +1262,34 @@ body::after {
    EXPANDED NEWS ITEMS & DIRECT LINK BUTTON
    ══════════════════════════════════════════════════════════════════ */
 .news-item.expanded {
-  background: rgba(18, 18, 35, 0.95);
-  border-color: var(--border-accent);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(245, 166, 35, 0.08);
+  background: rgba(15, 17, 34, 0.98) !important;
+  border-color: var(--gold-primary) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(245, 166, 35, 0.16) !important;
+  overflow: visible !important;
+}
+
+.news-header-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+  color: var(--gold-bright);
+  font-size: 0.65rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.news-header-link-btn:hover {
+  background: var(--gold-primary);
+  color: #000;
+  transform: scale(1.08);
+  box-shadow: 0 0 10px var(--gold-primary);
 }
 
 .news-item:hover .expand-toggle-btn {
@@ -1265,9 +1298,9 @@ body::after {
 }
 
 .news-direct-link-btn:hover {
-  background: linear-gradient(135deg, rgba(245, 166, 35, 0.35), rgba(245, 166, 35, 0.15)) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(245, 166, 35, 0.28) !important;
+  background: linear-gradient(135deg, rgba(245, 166, 35, 0.4), rgba(245, 166, 35, 0.2)) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 166, 35, 0.35) !important;
 }
 
 .header-settings-btn:hover {
