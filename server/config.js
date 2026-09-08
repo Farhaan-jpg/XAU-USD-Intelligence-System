@@ -36,7 +36,7 @@ const config = {
   // Polling intervals (ms) — optimized for zero delay and real-time streaming
   intervals: {
     price: 2500,       // 2.5 seconds (ultra responsive tick streaming)
-    news: 45000,       // 45 seconds
+    news: 20000,       // 20 seconds (zero delay breaking news)
     calendar: 10000,   // 10 seconds
   },
 
@@ -54,9 +54,12 @@ const config = {
   rssFeeds: [
     { name: 'ForexLive', url: 'https://www.forexlive.com/feed/news' },
     { name: 'FXStreet', url: 'https://www.fxstreet.com/rss/news' },
+    { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+    { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+    { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml' },
     { name: 'Investing.com Commodities', url: 'https://www.investing.com/rss/commodities.rss' },
-    { name: 'MarketWatch', url: 'https://feeds.marketwatch.com/marketwatch/topstories/' },
     { name: 'Investing.com Gold', url: 'https://www.investing.com/rss/news_25.rss' },
+    { name: 'MarketWatch', url: 'https://feeds.marketwatch.com/marketwatch/topstories/' },
     { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex' },
   ],
 
@@ -69,6 +72,9 @@ const config = {
     'jerome powell', 'powell', 'recession', 'ukraine', 'middle east', 'war',
     'sanctions', 'oil', 'crude', 'risk off', 'risk on', 'silver', 'commodity',
     'bond', 'deficit', 'debt ceiling', 'quantitative', 'qe', 'qt',
+    'iran', 'israel', 'lebanon', 'gaza', 'houthi', 'red sea', 'strait of hormuz',
+    'missile', 'airstrike', 'strike', 'escalation', 'ceasefire', 'taiwan',
+    'russia', 'nato', 'tariff', 'trade war',
   ],
 };
 
