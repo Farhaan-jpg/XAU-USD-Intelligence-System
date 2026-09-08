@@ -214,4 +214,4 @@ function updateConfig({ apiKey, model, fallbackModel }) {
   return { model: config.openrouter.model, hasKey: !!config.openrouter.apiKey };
 }
 
-module.exports = { scoreNewsItem, updateConfig };
+module.exports = { scoreNewsItem, updateConfig, keywordFallback };

@@ -35,7 +35,7 @@ export default function App() {
         {/* Left column: Market Structure + Price Grid + Calendar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           {/* Dynamic Overall Market Structure Engine */}
-          <MarketStructure prices={prices} newsFeed={newsFeed} />
+          <MarketStructure prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
           
           {/* Correlated Instruments Live Price Grid */}
           <PriceGrid prices={prices} />
