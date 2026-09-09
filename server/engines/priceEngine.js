@@ -65,6 +65,8 @@ class TVStreamer {
     this.sessionId = 'qs_' + Math.random().toString(36).substring(2, 10);
     this.reconnectTimer = null;
     this.isClosed = false;
+    this.bars = { '1': [], '5': [], '15': [], '60': [], '240': [], 'D': [] };
+    this.intervalChanges = {};
     this.connect();
   }
 
@@ -86,7 +88,7 @@ class TVStreamer {
       });
 
       this.ws.on('open', () => {
-        console.log('[TV-STREAM] Connected to live TradingView quote stream');
+        console.log('[TV-STREAM] Connected to live TradingView quote & chart stream');
         this.send('set_auth_token', ['unauthorized_user_token']);
         this.send('quote_create_session', [this.sessionId]);
         this.send('quote_set_fields', [
@@ -94,6 +96,15 @@ class TVStreamer {
           'lp', 'bid', 'ask', 'ch', 'chp', 'high_price', 'low_price', 'open_price', 'volume'
         ]);
         this.send('quote_add_symbols', [this.sessionId, ...this.symbols]);
+
+        // Subscribe to live candlestick series for all workstation chart timeframes
+        const intervals = ['1', '5', '15', '60', '240', 'D'];
+        intervals.forEach((itv) => {
+          const csId = 'cs_' + itv;
+          this.send('chart_create_session', [csId, '']);
+          this.send('resolve_symbol', [csId, `sym_${itv}`, '={"symbol":"OANDA:XAUUSD","adjustment":"splits"}']);
+          this.send('create_series', [csId, `sds_${itv}`, 's1', `sym_${itv}`, itv, 3, '']);
+        });
       });
 
       this.ws.on('message', (data) => {
@@ -110,6 +121,16 @@ class TVStreamer {
               const sym = parsed.p[1].n;
               const v = parsed.p[1].v;
               this.handleTick(sym, v);
+            } else if (parsed.m === 'timescale_update' || parsed.m === 'du') {
+              const cs = parsed.p && parsed.p[0];
+              if (cs && cs.startsWith('cs_')) {
+                const itv = cs.replace('cs_', '');
+                const payload = parsed.p[1];
+                const s = payload && payload[`sds_${itv}`]?.s;
+                if (s && s.length > 0) {
+                  this.handleBarUpdate(itv, s, parsed.m === 'du');
+                }
+              }
             }
           } catch (_) {}
         }
@@ -128,6 +149,52 @@ class TVStreamer {
     } catch (err) {
       console.error('[TV-STREAM] Connection setup error:', err.message);
       this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+    }
+  }
+
+  handleBarUpdate(itv, s, isDu) {
+    if (!this.bars[itv]) this.bars[itv] = [];
+
+    if (isDu) {
+      for (const barItem of s) {
+        const lastIdx = this.bars[itv].length - 1;
+        if (lastIdx >= 0 && this.bars[itv][lastIdx].i === barItem.i) {
+          this.bars[itv][lastIdx] = barItem;
+        } else {
+          this.bars[itv].push(barItem);
+        }
+      }
+    } else {
+      this.bars[itv] = s;
+    }
+
+    const bars = this.bars[itv];
+    if (!bars || bars.length === 0) return;
+
+    const currentBar = bars[bars.length - 1].v;
+    const prevBar = bars.length > 1 ? bars[bars.length - 2].v : null;
+    const prevClose = prevBar ? prevBar[4] : currentBar[1];
+    const lastClose = currentBar[4];
+    const ch = lastClose - prevClose;
+    const chp = prevClose > 0 ? (ch / prevClose) * 100 : 0;
+
+    this.intervalChanges[itv] = {
+      ch: parseFloat(ch.toFixed(3)),
+      chp: parseFloat(chp.toFixed(2)),
+      open: currentBar[1],
+      high: currentBar[2],
+      low: currentBar[3],
+      close: lastClose,
+      prevClose,
+    };
+
+    if (latestPrices['GC=F']) {
+      latestPrices['GC=F'].intervals = { ...this.intervalChanges };
+      if (itv === '5') {
+        latestPrices['GC=F'].change5m = parseFloat(chp.toFixed(4));
+      }
+      latestPrices['XAUUSD'] = latestPrices['GC=F'];
+      scheduleBroadcast();
     }
   }
 
@@ -151,6 +218,20 @@ class TVStreamer {
       const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
       const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(2)) : (existing.changeAbs || 0);
 
+      // Dynamically update active interval bar estimates with latest spot tick
+      for (const itv of Object.keys(this.intervalChanges)) {
+        const item = this.intervalChanges[itv];
+        if (item && item.prevClose) {
+          const tickCh = newPrice - item.prevClose;
+          const tickChp = (tickCh / item.prevClose) * 100;
+          item.ch = parseFloat(tickCh.toFixed(3));
+          item.chp = parseFloat(tickChp.toFixed(2));
+          item.close = newPrice;
+          item.high = Math.max(item.high || newPrice, newPrice);
+          item.low = Math.min(item.low || newPrice, newPrice);
+        }
+      }
+
       // Buffer
       if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
       priceHistory['GC=F'].push({ price: newPrice, ts: Date.now() });
@@ -165,7 +246,7 @@ class TVStreamer {
         unit: 'USD/oz',
         correlation: 'primary',
         price: newPrice,
-        change5m: parseFloat(change5m.toFixed(4)),
+        change5m: this.intervalChanges['5']?.chp !== undefined ? this.intervalChanges['5'].chp : parseFloat(change5m.toFixed(4)),
         changeDay: chp,
         changeAbs: ch,
         bid,
@@ -178,6 +259,7 @@ class TVStreamer {
         updatedAt: new Date().toISOString(),
         latency: 'REALTIME_WEBSOCKET',
         source: 'OANDA:XAUUSD_STREAM',
+        intervals: { ...this.intervalChanges },
       };
 
       latestPrices['GC=F'] = goldData;
@@ -402,6 +484,10 @@ async function fetchAllPrices() {
       const oldest = priceHistory['GC=F'][0]?.price;
       const change5m = oldest ? ((goldPrice - oldest) / oldest) * 100 : 0;
 
+      const prevIntervals = latestPrices['GC=F']?.intervals || {};
+      const changeDayVal = liveGold.changeDay || (latestPrices['GC=F']?.changeDay || 0);
+      const changeAbsVal = liveGold.changeAbs || 0;
+
       const goldData = {
         symbol: 'GC=F',
         label: 'XAU/USD',
@@ -410,8 +496,8 @@ async function fetchAllPrices() {
         correlation: 'primary',
         price: goldPrice,
         change5m: parseFloat(change5m.toFixed(4)),
-        changeDay: liveGold.changeDay || (latestPrices['GC=F']?.changeDay || 0),
-        changeAbs: liveGold.changeAbs || 0,
+        changeDay: changeDayVal,
+        changeAbs: changeAbsVal,
         bid: liveGold.bid || goldPrice,
         ask: liveGold.ask || goldPrice,
         high: liveGold.high || goldPrice,
@@ -422,6 +508,14 @@ async function fetchAllPrices() {
         updatedAt: new Date().toISOString(),
         latency: 'REALTIME_HTTP',
         source: liveGold.source || 'HTTP_FALLBACK',
+        intervals: {
+          '1': prevIntervals['1'] || { ch: 0, chp: 0 },
+          '5': prevIntervals['5'] || { ch: parseFloat(((goldPrice * change5m) / 100).toFixed(2)), chp: parseFloat(change5m.toFixed(2)) },
+          '15': prevIntervals['15'] || { ch: 0, chp: 0 },
+          '60': prevIntervals['60'] || { ch: 0, chp: 0 },
+          '240': prevIntervals['240'] || { ch: 0, chp: 0 },
+          'D': { ch: changeAbsVal, chp: changeDayVal },
+        },
       };
       results['GC=F'] = goldData;
       results['XAUUSD'] = goldData;

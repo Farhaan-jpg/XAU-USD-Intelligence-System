@@ -69,6 +69,26 @@ export default function TradingChart({ prices = {} }) {
   // TradingView embed URL with custom interval and dark theme
   const tvSrc = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=OANDA%3AXAUUSD&interval=${interval}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0a0f18&studies=%5B%22MASimple%40tv-basicstudies%22%2C%22RSI%40tv-basicstudies%22%5D&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%22paneProperties.background%22%3A%22%23090e17%22%2C%22paneProperties.vertGridProperties.color%22%3A%22rgba(255%2C255%2C255%2C0.03)%22%2C%22paneProperties.horzGridProperties.color%22%3A%22rgba(255%2C255%2C0.03)%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&utm_source=localhost`;
 
+  const activeTf = intervals.find((t) => t.val === interval) || { label: '5M', val: '5' };
+  const tfData = gold.intervals?.[interval];
+
+  let displayPercent = 0;
+  let displayAbs = null;
+
+  if (tfData && typeof tfData.chp === 'number') {
+    displayPercent = tfData.chp;
+    displayAbs = tfData.ch;
+  } else if (interval === 'D') {
+    displayPercent = parseFloat(gold.changeDay || 0);
+    displayAbs = typeof gold.changeAbs === 'number' ? parseFloat(gold.changeAbs.toFixed(2)) : null;
+  } else if (interval === '5' && gold.change5m !== undefined) {
+    displayPercent = parseFloat(gold.change5m || 0);
+    displayAbs = spotPrice > 0 ? parseFloat(((spotPrice * displayPercent) / 100).toFixed(2)) : null;
+  } else {
+    displayPercent = parseFloat(gold.changeDay || 0);
+    displayAbs = typeof gold.changeAbs === 'number' ? parseFloat(gold.changeAbs.toFixed(2)) : null;
+  }
+
   const bid = gold.bid ? parseFloat(gold.bid).toFixed(2) : null;
   const ask = gold.ask ? parseFloat(gold.ask).toFixed(2) : null;
   const spread = (bid && ask && parseFloat(ask) >= parseFloat(bid)) ? (parseFloat(ask) - parseFloat(bid)).toFixed(2) : null;
@@ -94,11 +114,48 @@ export default function TradingChart({ prices = {} }) {
               </span>
               <span
                 className="spot-price-change"
-                style={{ color: parseFloat(gold.changeDay || gold.change5m || 0) >= 0 ? 'var(--bull-glow)' : 'var(--bear-glow)' }}
-                title={`24h Change: ${gold.changeDay || 0}% | 5m Velocity: ${gold.change5m || 0}%`}
+                style={{ color: displayPercent >= 0 ? 'var(--bull-glow)' : 'var(--bear-glow)' }}
+                title={`${activeTf.label} Candle: ${displayAbs !== null ? (displayAbs >= 0 ? '+' : '') + displayAbs.toFixed(2) : ''} (${displayPercent >= 0 ? '+' : ''}${displayPercent.toFixed(2)}%) | 24h Change: ${gold.changeDay || 0}%`}
               >
-                {gold.changeDay !== undefined ? `${parseFloat(gold.changeDay) >= 0 ? '+' : ''}${gold.changeDay}%` : `${parseFloat(gold.change5m || 0) >= 0 ? '+' : ''}${gold.change5m || 0}%`}
+                {displayAbs !== null && (
+                  <span style={{ marginRight: '4px', opacity: 0.9 }}>
+                    {displayAbs >= 0 ? '+' : ''}{displayAbs.toFixed(2)}
+                  </span>
+                )}
+                ({displayPercent >= 0 ? '+' : ''}{displayPercent.toFixed(2)}%)
               </span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: 'var(--text-dim)',
+                  fontWeight: 600,
+                  letterSpacing: '0.5px',
+                  lineHeight: 'normal',
+                }}
+              >
+                {activeTf.label}
+              </span>
+              {interval !== 'D' && gold.changeDay !== undefined && (
+                <span
+                  style={{
+                    fontSize: '10px',
+                    padding: '1px 6px',
+                    borderRadius: '3px',
+                    background: 'rgba(255, 215, 0, 0.08)',
+                    border: '1px solid rgba(255, 215, 0, 0.18)',
+                    color: 'var(--gold-glow)',
+                    fontWeight: 600,
+                    letterSpacing: '0.5px',
+                    lineHeight: 'normal',
+                  }}
+                  title="24-Hour Net Session Change"
+                >
+                  24H: {parseFloat(gold.changeDay) >= 0 ? '+' : ''}{parseFloat(gold.changeDay).toFixed(2)}%
+                </span>
+              )}
             </div>
             {bid && ask && (
               <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
