@@ -69,11 +69,15 @@ class TVStreamer {
     this.connect();
   }
 
-  send(m, p) {
+  sendRaw(str) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const msg = JSON.stringify({ m, p });
-      this.ws.send(`~m~${msg.length}~m~${msg}`);
+      this.ws.send(str);
     }
+  }
+
+  send(m, p) {
+    const msg = JSON.stringify({ m, p });
+    this.sendRaw(`~m~${msg.length}~m~${msg}`);
   }
 
   connect() {
@@ -102,7 +106,8 @@ class TVStreamer {
         const chunks = raw.split(/~m~\d+~m~/).filter(Boolean);
         for (const chunk of chunks) {
           if (chunk.startsWith('~h~')) {
-            this.send('~m~' + chunk.length + '~m~' + chunk); // heartbeat reply
+            // Heartbeat pong must be sent raw: ~m~length~m~~h~id
+            this.sendRaw(`~m~${chunk.length}~m~${chunk}`);
             continue;
           }
           try {
