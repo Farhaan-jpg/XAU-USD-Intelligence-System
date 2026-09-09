@@ -2,7 +2,7 @@
 // Real-Time Multi-Wire News Aggregator with Filter Pills & AI Reasoning
 
 import { useState, useMemo } from 'react';
-import { Newspaper, ExternalLink, Copy, Check, Filter, Sparkles, AlertCircle } from 'lucide-react';
+import { Newspaper, ExternalLink, Copy, Check, Filter, Sparkles, Radio } from 'lucide-react';
 
 export default function NewsTerminal({ newsFeed = [] }) {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'HIGH' | 'BULLISH' | 'BEARISH' | 'GEO'
@@ -32,7 +32,7 @@ export default function NewsTerminal({ newsFeed = [] }) {
   };
 
   const filters = [
-    { id: 'ALL', label: 'ALL WIRE' },
+    { id: 'ALL', label: `ALL (${newsFeed.length})` },
     { id: 'HIGH', label: 'HIGH IMPACT' },
     { id: 'BULLISH', label: 'BULLISH' },
     { id: 'BEARISH', label: 'BEARISH' },
@@ -40,7 +40,7 @@ export default function NewsTerminal({ newsFeed = [] }) {
   ];
 
   return (
-    <div className="panel-card" style={{ height: '100%' }}>
+    <div className="panel-card panel-card-flex" style={{ height: '100%' }}>
       <div className="panel-header">
         <span className="panel-title">
           <Newspaper size={15} />
@@ -64,8 +64,8 @@ export default function NewsTerminal({ newsFeed = [] }) {
       {/* News Items List */}
       <div className="news-feed-container">
         {filteredNews.length === 0 ? (
-          <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-dim)' }}>
-            No news matching the current filter. Live scanner listening...
+          <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-dim)' }}>
+            No news matching the current filter. Live news scanner listening for incoming ticks...
           </div>
         ) : (
           filteredNews.map((item) => {
@@ -148,6 +148,26 @@ export default function NewsTerminal({ newsFeed = [] }) {
             );
           })
         )}
+      </div>
+
+      {/* Terminal Footer Strip to anchor bottom with zero dead space */}
+      <div
+        style={{
+          borderTop: '1px solid var(--border-subtle)',
+          paddingTop: '8px',
+          marginTop: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '11px',
+          color: 'var(--text-dim)',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Radio size={12} style={{ color: 'var(--bull-glow)' }} />
+          <span>SCANNING 9 LIVE WIRE FEEDS</span>
+        </span>
+        <span>SHOWING {filteredNews.length} ITEMS</span>
       </div>
     </div>
   );

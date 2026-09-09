@@ -55,7 +55,7 @@ export default function EconomicCalendar({ calendarData = {} }) {
   }, [nextCatalyst, now]);
 
   return (
-    <div className="panel-card">
+    <div className="panel-card panel-card-flex" style={{ height: '100%' }}>
       <div className="panel-header">
         <span className="panel-title">
           <CalendarIcon size={15} />
@@ -231,6 +231,23 @@ export default function EconomicCalendar({ calendarData = {} }) {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Calendar Footer Strip matching NewsTerminal */}
+      <div
+        style={{
+          borderTop: '1px solid var(--border-subtle)',
+          paddingTop: '8px',
+          marginTop: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '11px',
+          color: 'var(--text-dim)',
+        }}
+      >
+        <span>SYNCHRONIZED WITH FOREX FACTORY</span>
+        <span>SHOWING {filteredEvents.length} SCHEDULED EVENTS</span>
       </div>
     </div>
   );

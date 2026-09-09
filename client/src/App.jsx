@@ -164,15 +164,13 @@ export default function App() {
             {/* Middle Section: Macro Correlation Radar */}
             <MacroRadar prices={prices} />
 
-            {/* Bottom Grid: Intelligence & News Terminal */}
-            <div className="grid-terminal-bottom">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
-                <EconomicCalendar calendarData={calendarData} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <NewsTerminal newsFeed={newsFeed} />
-              </div>
+            {/* Full-Width AI Trade Copilot & Institutional Scenario Playbook */}
+            <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+
+            {/* Bottom Grid: Real-Time Economic Calendar & Live News Wire Side-by-Side */}
+            <div className="grid-terminal-events-news">
+              <EconomicCalendar calendarData={calendarData} />
+              <NewsTerminal newsFeed={newsFeed} />
             </div>
           </>
         )}
