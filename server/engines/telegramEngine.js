@@ -158,6 +158,54 @@ function updateConfig(newToken, newChatId) {
 }
 
 /**
+ * Broadcast an AI Trade Setup card to Telegram
+ */
+async function sendTradeSignal(tradePlan, spotPrice) {
+  if (!isReady || !bot) return { success: false, error: 'Telegram bot not configured' };
+
+  const biasEmoji = (tradePlan.bias || '').includes('BUY') ? '🟢 LONG' : '🔴 SHORT';
+  const confidence = tradePlan.confidence || 85;
+
+  const message = `🎯 *[XAU/USD INSTITUTIONAL TRADE SETUP]*
+
+⚡ *Action:* ${biasEmoji}
+💰 *Spot Ref:* $${spotPrice || '--'}
+🚪 *Optimal Entry:* $${tradePlan.entryZone || '--'}
+🛑 *Invalidation SL:* $${tradePlan.stopLoss || '--'}
+🎯 *Take Profit 1:* $${tradePlan.takeProfit1 || '--'}
+🏆 *Take Profit 2:* $${tradePlan.takeProfit2 || '--'}
+⚖️ *Risk/Reward:* ${tradePlan.riskReward || '1:2.5'}
+🛡️ *Confidence:* ${confidence}%
+
+📝 *Institutional Thesis:*
+${escapeMarkdown(tradePlan.narrative || tradePlan.setup || 'High-probability technical confluence setup.')}
+
+⚠️ *Pre-News Scenario:*
+${escapeMarkdown(tradePlan.preEventPlaybook || 'Maintain strict risk management ahead of catalysts.')}
+
+🕐 *Timestamp:* ${new Date().toUTCString()}
+_Automated from XAU/USD Intelligence System_`;
+
+  try {
+    await bot.sendMessage(config.telegram.chatId, message, {
+      parse_mode: 'MarkdownV2',
+      disable_web_page_preview: true,
+    });
+    console.log(`[TELEGRAM] ✅ Trade signal broadcast sent: ${tradePlan.bias}`);
+    return { success: true };
+  } catch (err) {
+    console.error('[TELEGRAM] Trade signal send failed, falling back to plain text:', err.message);
+    try {
+      const plain = `🎯 [XAU/USD TRADE SETUP]\nAction: ${tradePlan.bias}\nEntry: ${tradePlan.entryZone}\nSL: ${tradePlan.stopLoss}\nTP1: ${tradePlan.takeProfit1}\nTP2: ${tradePlan.takeProfit2}\nRR: ${tradePlan.riskReward}\n\nThesis: ${tradePlan.narrative || ''}\nTime: ${new Date().toUTCString()}`;
+      await bot.sendMessage(config.telegram.chatId, plain);
+      return { success: true };
+    } catch (fallbackErr) {
+      return { success: false, error: fallbackErr.message };
+    }
+  }
+}
+
+/**
  * Escape special MarkdownV2 characters
  */
 function escapeMarkdown(text) {
@@ -165,4 +213,4 @@ function escapeMarkdown(text) {
   return String(text).replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
 }
 
-module.exports = { init, sendNewsAlert, sendCalendarAlert, sendStartupMessage, sendTestAlert, updateConfig };
+module.exports = { init, sendNewsAlert, sendCalendarAlert, sendTradeSignal, sendStartupMessage, sendTestAlert, updateConfig };

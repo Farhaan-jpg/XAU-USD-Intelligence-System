@@ -116,6 +116,20 @@ app.post('/api/ai/test', async (req, res) => {
   }
 });
 
+// Broadcast trade plan to Telegram VIP Channel
+app.post('/api/ai/broadcast-signal', async (req, res) => {
+  try {
+    const { tradePlan, spotPrice } = req.body || {};
+    if (!tradePlan) {
+      return res.status(400).json({ success: false, error: 'Trade plan is required' });
+    }
+    const result = await telegramEngine.sendTradeSignal(tradePlan, spotPrice);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Settings endpoints
 app.get('/api/settings', (req, res) => {
   const maskKey = (k) => (k ? `${k.substring(0, 8)}...${k.slice(-4)}` : '');

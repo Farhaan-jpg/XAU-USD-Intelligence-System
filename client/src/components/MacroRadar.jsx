@@ -1,8 +1,6 @@
-// client/src/components/MacroRadar.jsx
-// Macro Correlation Radar & Real-Time Intermarket Divergence Detector
-
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Radar, ArrowUpRight, ArrowDownRight, AlertTriangle, Activity } from 'lucide-react';
+import { playDivergenceAlert, speakSquawk } from '../utils/audioAlerts';
 
 export default function MacroRadar({ prices = {} }) {
   const gold = prices['GC=F'] || {};
@@ -17,7 +15,7 @@ export default function MacroRadar({ prices = {} }) {
   const silverPrice = parseFloat(silver.price || 0);
   const gsr = goldPrice > 0 && silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '82.4';
 
-  // Divergence Engine
+  // Divergence Engine with Sound & Voice Squawk
   const divergence = useMemo(() => {
     const goldChg = parseFloat(gold.change5m || 0);
     const dxyChg = parseFloat(dxy.change5m || 0);
@@ -59,6 +57,14 @@ export default function MacroRadar({ prices = {} }) {
 
     return null;
   }, [gold, silver, dxy, us10y]);
+
+  // Audio trigger on new divergence
+  useEffect(() => {
+    if (divergence) {
+      playDivergenceAlert();
+      speakSquawk(`Macro Alert. ${divergence.title}. ${divergence.desc}`);
+    }
+  }, [divergence?.type]);
 
   const cards = [
     {

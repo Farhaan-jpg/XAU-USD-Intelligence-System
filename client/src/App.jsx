@@ -14,6 +14,9 @@ import NewsTerminal from './components/NewsTerminal';
 import EconomicCalendar from './components/EconomicCalendar';
 import SettingsModal from './components/SettingsModal';
 import StatusBar from './components/StatusBar';
+import SmartLiquidityRadar from './components/SmartLiquidityRadar';
+import VolatilityTrapDetector from './components/VolatilityTrapDetector';
+import COTSentimentGauge from './components/COTSentimentGauge';
 import { playFlashAlert, playEventWarning } from './utils/audioAlerts';
 import {
   LayoutDashboard,
@@ -23,6 +26,8 @@ import {
   Calendar,
   Calculator,
   AlertTriangle,
+  Target,
+  Award,
 } from 'lucide-react';
 
 export default function App() {
@@ -109,6 +114,23 @@ export default function App() {
         </button>
 
         <button
+          className={`tab-btn ${activeTab === 'LIQUIDITY' ? 'active' : ''}`}
+          onClick={() => setActiveTab('LIQUIDITY')}
+        >
+          <Target size={15} />
+          <span>SMART LIQUIDITY</span>
+          <span className="tab-pill">SMC</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'COT' ? 'active' : ''}`}
+          onClick={() => setActiveTab('COT')}
+        >
+          <Award size={15} />
+          <span>COT POSITIONING</span>
+        </button>
+
+        <button
           className={`tab-btn ${activeTab === 'CALENDAR' ? 'active' : ''}`}
           onClick={() => setActiveTab('CALENDAR')}
         >
@@ -152,7 +174,10 @@ export default function App() {
             {/* Global Session Clock Strip */}
             <SessionClock />
 
-            {/* Top Grid: Trading Chart & Confluence Bias Meter */}
+            {/* Post-News Volatility Trap Detector */}
+            <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
+
+            {/* Top Grid: TradingView Chart & Confluence Bias Meter */}
             <div className="grid-terminal-top">
               <TradingChart prices={prices} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -161,8 +186,14 @@ export default function App() {
               </div>
             </div>
 
+            {/* Smart Liquidity & Order Block Radar (ICT / SMC) */}
+            <SmartLiquidityRadar prices={prices} />
+
             {/* Middle Section: Macro Correlation Radar */}
             <MacroRadar prices={prices} />
+
+            {/* CFTC Institutional Speculator vs Commercial Sentiment */}
+            <COTSentimentGauge />
 
             {/* Full-Width AI Trade Copilot & Institutional Scenario Playbook */}
             <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
@@ -200,7 +231,25 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 5: Economic Calendar Focus */}
+        {/* Tab 5: Smart Liquidity & SMC Focus */}
+        {activeTab === 'LIQUIDITY' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <SmartLiquidityRadar prices={prices} />
+            <TradingChart prices={prices} />
+            <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
+          </div>
+        )}
+
+        {/* Tab 6: COT Positioning Focus */}
+        {activeTab === 'COT' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <COTSentimentGauge />
+            <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <MacroRadar prices={prices} />
+          </div>
+        )}
+
+        {/* Tab 7: Economic Calendar Focus */}
         {activeTab === 'CALENDAR' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <EconomicCalendar calendarData={calendarData} />
@@ -208,7 +257,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 6: Risk & Lot Calculator Focus */}
+        {/* Tab 8: Risk & Lot Calculator Focus */}
         {activeTab === 'CALCULATOR' && (
           <div style={{ maxWidth: '800px', margin: '20px auto', width: '100%' }}>
             <RiskCalculator currentGoldPrice={currentGoldPrice} />

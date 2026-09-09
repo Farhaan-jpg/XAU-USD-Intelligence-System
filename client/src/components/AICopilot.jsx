@@ -12,7 +12,10 @@ import {
   AlertOctagon,
   FileText,
   Workflow,
+  Radio,
+  Send,
 } from 'lucide-react';
+import { speakSquawk } from '../utils/audioAlerts';
 
 export default function AICopilot({ prices = {}, newsFeed = [], calendarData = {}, activeSession = 'London/NY Overlap' }) {
   const [loading, setLoading] = useState(false);
@@ -47,9 +50,53 @@ export default function AICopilot({ prices = {}, newsFeed = [], calendarData = {
     fetchTradePlan();
   }, []);
 
+  const [broadcastStatus, setBroadcastStatus] = useState(null);
+
   const bias = copilotData?.bias || 'BUY';
   const isBull = bias.includes('BUY');
   const isBear = bias.includes('SELL');
+
+  const handleBroadcastTelegram = async () => {
+    if (!copilotData) return;
+    setBroadcastStatus('sending');
+    try {
+      const gold = prices['GC=F'] || {};
+      const spot = gold.price || '2350';
+      const res = await fetch('/api/ai/broadcast-signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tradePlan: {
+            bias: copilotData.bias,
+            entryZone: copilotData.entryZone,
+            stopLoss: copilotData.stopLoss,
+            takeProfit1: copilotData.target1,
+            takeProfit2: copilotData.target2,
+            riskReward: copilotData.riskReward,
+            confidence: copilotData.confidence,
+            narrative: copilotData.macroThesis,
+            preEventPlaybook: copilotData.hawkishPlaybook ? `Hawkish: ${copilotData.hawkishPlaybook} | Dovish: ${copilotData.dovishPlaybook}` : '',
+          },
+          spotPrice: spot,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBroadcastStatus('sent');
+      } else {
+        setBroadcastStatus('error');
+      }
+    } catch (_) {
+      setBroadcastStatus('error');
+    }
+    setTimeout(() => setBroadcastStatus(null), 3500);
+  };
+
+  const handleVoiceSquawk = () => {
+    if (!copilotData) return;
+    const speech = `Institutional Gold Alert. Recommendation: ${copilotData.bias}. Optimal entry: ${copilotData.entryZone}. Invalidation stop: ${copilotData.stopLoss}. Target: ${copilotData.target1}. ${copilotData.macroThesis}`;
+    speakSquawk(speech);
+  };
 
   return (
     <div className="panel-card">
@@ -58,15 +105,53 @@ export default function AICopilot({ prices = {}, newsFeed = [], calendarData = {
           <Sparkles size={15} />
           AI TRADE COPILOT & SCENARIO PLAYBOOK
         </span>
-        <button
-          className="filter-pill"
-          onClick={fetchTradePlan}
-          disabled={loading}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <RefreshCw size={12} className={loading ? 'spin-icon' : ''} />
-          <span>{loading ? 'ANALYZING...' : 'REFRESH TRADE PLAN'}</span>
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Voice Squawk Button */}
+          <button
+            className="filter-pill"
+            onClick={handleVoiceSquawk}
+            title="Read out signal with AI Voice Squawk"
+            style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+          >
+            <span>🔊 SQUAWK</span>
+          </button>
+
+          {/* Telegram VIP Broadcaster Button */}
+          <button
+            className="filter-pill"
+            onClick={handleBroadcastTelegram}
+            disabled={broadcastStatus === 'sending'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              borderColor: broadcastStatus === 'sent' ? 'var(--bull-glow)' : 'var(--border-gold)',
+              color: broadcastStatus === 'sent' ? 'var(--bull-glow)' : 'var(--gold-glow)',
+            }}
+          >
+            <span>
+              {broadcastStatus === 'sending'
+                ? 'BROADCASTING...'
+                : broadcastStatus === 'sent'
+                ? '✓ BROADCASTED TO VIP'
+                : broadcastStatus === 'error'
+                ? 'TELEGRAM UNCONFIGURED'
+                : '✈ BROADCAST VIP'}
+            </span>
+          </button>
+
+          {/* Refresh Button */}
+          <button
+            className="filter-pill"
+            onClick={fetchTradePlan}
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <RefreshCw size={12} className={loading ? 'spin-icon' : ''} />
+            <span>{loading ? 'ANALYZING...' : 'REFRESH'}</span>
+          </button>
+        </div>
       </div>
 
       {copilotData ? (
