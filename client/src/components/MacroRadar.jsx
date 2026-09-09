@@ -17,13 +17,18 @@ export default function MacroRadar({ prices = {} }) {
 
   // Divergence Engine with Sound & Voice Squawk
   const divergence = useMemo(() => {
-    const goldChg = parseFloat(gold.change5m || 0);
-    const dxyChg = parseFloat(dxy.change5m || 0);
-    const us10yChg = parseFloat(us10y.change5m || 0);
-    const silverChg = parseFloat(silver.change5m || 0);
+    const goldChg5m = parseFloat(gold.change5m || 0);
+    const dxyChg5m = parseFloat(dxy.change5m || 0);
+    const dxyChgDay = parseFloat(dxy.changeDay || 0);
+    const us10yChg5m = parseFloat(us10y.change5m || 0);
+    const us10yChgDay = parseFloat(us10y.changeDay || 0);
+    const silverChg5m = parseFloat(silver.change5m || 0);
+
+    const dxyImpulse = (dxyChg5m * 0.7) + (dxyChgDay * 0.3);
+    const us10yImpulse = (us10yChg5m * 0.7) + (us10yChgDay * 0.3);
 
     // Bullish Divergence
-    if (dxyChg < -0.04 && us10yChg < -0.03 && goldChg <= 0.01) {
+    if (dxyImpulse < -0.03 && us10yImpulse < -0.02 && goldChg5m <= 0.01) {
       return {
         type: 'BULLISH_DIVERGENCE',
         title: 'Institutional Bullish Divergence',
@@ -34,7 +39,7 @@ export default function MacroRadar({ prices = {} }) {
     }
 
     // Bearish Divergence
-    if (dxyChg > 0.04 && us10yChg > 0.03 && goldChg >= -0.01) {
+    if (dxyImpulse > 0.03 && us10yImpulse > 0.02 && goldChg5m >= -0.01) {
       return {
         type: 'BEARISH_DIVERGENCE',
         title: 'Yield / Dollar Warning',
@@ -45,7 +50,7 @@ export default function MacroRadar({ prices = {} }) {
     }
 
     // Silver Lead Divergence
-    if (silverChg > 0.08 && goldChg < 0.02) {
+    if (silverChg5m > 0.06 && goldChg5m < 0.02) {
       return {
         type: 'SILVER_LEAD',
         title: 'Silver High-Beta Lead Signal',

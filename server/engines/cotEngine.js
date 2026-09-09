@@ -7,6 +7,8 @@ const axios = require('axios');
 let io = null;
 let pollTimer = null;
 let isRunning = false;
+let lastBroadcastTime = 0;
+let lastLongPct = -1;
 
 // Format latest CFTC release date string (CFTC reports are released every Friday at 3:30 PM EST for previous Tuesday)
 function getLatestCOTReportDate() {
@@ -102,7 +104,10 @@ function updateWithLivePrice(price, change5m) {
   cotState.reportDate = getLatestCOTReportDate();
   cotState.lastUpdated = new Date().toISOString();
 
-  if (io) {
+  const now = Date.now();
+  if (io && (longPct !== lastLongPct || now - lastBroadcastTime > 2000)) {
+    lastBroadcastTime = now;
+    lastLongPct = longPct;
     io.emit('cot_update', cotState);
   }
 }

@@ -10,85 +10,158 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const gold = prices['GC=F'] || prices['XAUUSD'] || {};
     const dxy = prices['DX-Y.NYB'] || {};
     const us10y = prices['^TNX'] || {};
+    const us02y = prices['^IRX'] || {};
     const silver = prices['SI=F'] || prices['XAGUSD'] || {};
     const usdjpy = prices['JPY=X'] || {};
+    const oil = prices['CL=F'] || {};
 
-    const goldChg = parseFloat(gold.change5m || 0);
-    const dxyChg = parseFloat(dxy.change5m || 0);
-    const us10yChg = parseFloat(us10y.change5m || 0);
-    const silverChg = parseFloat(silver.change5m || 0);
-    const usdjpyChg = parseFloat(usdjpy.change5m || 0);
+    const spotPrice = parseFloat(gold.price || 0);
+    const goldHigh = parseFloat(gold.high || spotPrice);
+    const goldLow = parseFloat(gold.low || spotPrice);
+    const goldOpen = parseFloat(gold.open || spotPrice);
 
-    // 1. Macro Dollar & Yields Confluence (0-100 normalized)
-    // Gold is inversely correlated to DXY and US10Y
-    let macroVal = 50;
-    if (dxyChg < -0.02) macroVal += 20;
-    else if (dxyChg > 0.02) macroVal -= 20;
+    const goldChg5m = parseFloat(gold.change5m || 0);
+    const goldChgDay = parseFloat(gold.changeDay || 0);
+    const dxyChg5m = parseFloat(dxy.change5m || 0);
+    const dxyChgDay = parseFloat(dxy.changeDay || 0);
+    const us10yChg5m = parseFloat(us10y.change5m || 0);
+    const us10yChgDay = parseFloat(us10y.changeDay || 0);
+    const us02yChg5m = parseFloat(us02y.change5m || 0);
+    const us02yChgDay = parseFloat(us02y.changeDay || 0);
+    const silverChg5m = parseFloat(silver.change5m || 0);
+    const usdjpyChg5m = parseFloat(usdjpy.change5m || 0);
+    const oilChg5m = parseFloat(oil.change5m || 0);
+    const oilChgDay = parseFloat(oil.changeDay || 0);
 
-    if (us10yChg < -0.02) macroVal += 20;
-    else if (us10yChg > 0.02) macroVal -= 20;
+    // ─── 1. Macro Dollar, Yields & Energy Intermarket Vector (0-100) ───────
+    // Combines 5m short-term impulse (65%) with daily trend momentum (35%)
+    const dxyImpulse = (dxyChg5m * 0.65) + (dxyChgDay * 0.35);
+    const us10yImpulse = (us10yChg5m * 0.65) + (us10yChgDay * 0.35);
+    const us02yImpulse = (us02yChg5m * 0.65) + (us02yChgDay * 0.35);
+    const oilImpulse = (oilChg5m * 0.65) + (oilChgDay * 0.35);
+    const usdjpyImpulse = usdjpyChg5m; // USD/JPY weakness = safe-haven yen flow
 
-    if (usdjpyChg < -0.02) macroVal += 10; // Yen safe-haven boost
-    else if (usdjpyChg > 0.02) macroVal -= 10;
-    macroVal = Math.max(0, Math.min(100, macroVal));
+    // Drag against Gold (DXY and Treasury yields rising hurts Gold)
+    // Boost for Gold (Crude oil rising adds inflation hedge, Yen strengthening adds safe haven)
+    const macroDrag =
+      (dxyImpulse * 22) +
+      (us10yImpulse * 14) +
+      (us02yImpulse * 8) +
+      (usdjpyImpulse * 6) -
+      (oilImpulse * 8);
 
-    // 2. AI News Sentiment (0-100)
-    const recent = newsFeed.slice(0, 20);
+    const macroVal = Math.max(0, Math.min(100, Math.round(50 - macroDrag)));
+
+    // ─── 2. AI News Sentiment with Exponential Recency Decay (0-100) ───────
+    const recent = newsFeed.slice(0, 25);
     let bullWeight = 0;
     let bearWeight = 0;
+    let neutralWeight = 0;
+    const nowMs = Date.now();
+
     recent.forEach((item) => {
-      const w = item.impact === 'HIGH' ? 3 : item.impact === 'MED' ? 2 : 1;
+      const baseW = item.impact === 'HIGH' ? 3.5 : item.impact === 'MED' ? 2.0 : 1.0;
+      const pubMs = new Date(item.publishedAt || item.processedAt || nowMs).getTime();
+      const ageMins = Math.max(0, (nowMs - pubMs) / 60000);
+
+      // Recency weighting: <30m = 1.5x, <2h = 1.2x, <6h = 1.0x, >6h = 0.7x
+      const recencyFactor = ageMins <= 30 ? 1.5 : ageMins <= 120 ? 1.2 : ageMins <= 360 ? 1.0 : 0.7;
+      const w = baseW * recencyFactor;
+
       if (item.bias === 'BULLISH') bullWeight += w;
       else if (item.bias === 'BEARISH') bearWeight += w;
+      else neutralWeight += w * 0.5;
     });
-    const totalW = bullWeight + bearWeight;
-    const sentimentVal = totalW > 0 ? Math.round((bullWeight / totalW) * 100) : 50;
 
-    // 3. Technical Velocity & Silver Confirmation (0-100)
-    let techVal = 50;
-    if (goldChg > 0.05) techVal += 25;
-    else if (goldChg > 0.01) techVal += 15;
-    else if (goldChg < -0.05) techVal -= 25;
-    else if (goldChg < -0.01) techVal -= 15;
+    const totalWeight = bullWeight + bearWeight + neutralWeight;
+    const sentimentVal =
+      totalWeight > 0
+        ? Math.max(0, Math.min(100, Math.round(((bullWeight + neutralWeight * 0.5) / totalWeight) * 100)))
+        : 50;
 
-    if (silverChg > 0.05) techVal += 25;
-    else if (silverChg < -0.05) techVal -= 25;
-    techVal = Math.max(0, Math.min(100, techVal));
+    // ─── 3. Technical Velocity & SMC Auction Structure (0-100) ─────────────
+    const dayRange = Math.max(1, goldHigh - goldLow);
+    const priceLocation = spotPrice > 0 ? (spotPrice - goldLow) / dayRange : 0.5; // 0 = low of day, 1 = high of day
+    const sessionInitiative = goldOpen > 0 && spotPrice >= goldOpen ? 1 : -1;
 
-    // 4. Macro Catalyst & Calendar Event Direction (0-100)
+    // Silver Beta Confirmation (Silver leading higher confirms broad institutional participation)
+    const silverBetaSpread = silverChg5m - goldChg5m;
+
+    const techDelta =
+      (goldChg5m * 35) +
+      (goldChgDay * 12) +
+      (silverBetaSpread * 20) +
+      ((priceLocation - 0.5) * 20) +
+      (sessionInitiative * 5);
+
+    const techVal = Math.max(0, Math.min(100, Math.round(50 + techDelta)));
+
+    // ─── 4. Macro Catalyst & Calendar Event Direction (0-100) ──────────────
     let eventRiskVal = 50;
     let imminentEventWarning = null;
     const upcoming = calendarData?.events || calendarData?.upcomingEvents || [];
     const nextHigh = upcoming.find((e) => e.impact === 'HIGH');
+
     if (nextHigh) {
       const eventTime = new Date(nextHigh.date || nextHigh.timeUTC).getTime();
-      const diffMins = Math.round((eventTime - Date.now()) / 60000);
+      const diffMins = Math.round((eventTime - nowMs) / 60000);
 
-      // If event recently occurred (past 60m) with reported data:
-      if (diffMins < 0 && diffMins >= -60 && nextHigh.actual && nextHigh.forecast) {
+      // If event recently occurred (past 90m) with reported data:
+      if (diffMins < 0 && diffMins >= -90 && nextHigh.actual && nextHigh.forecast) {
         const act = parseFloat(nextHigh.actual);
         const fcast = parseFloat(nextHigh.forecast);
         if (!isNaN(act) && !isNaN(fcast)) {
-          eventRiskVal = act > fcast ? 30 : 70;
+          const type = (nextHigh.type || nextHigh.title || '').toUpperCase();
+          // Direct polarity: Higher is Bullish for Gold (Unemployment, Claims, China demand)
+          const isDirectToGold =
+            type.includes('UNEMPLOYMENT') ||
+            type.includes('CLAIM') ||
+            nextHigh.currency === 'CNY';
+
+          if (isDirectToGold) {
+            eventRiskVal = act > fcast ? 75 : act < fcast ? 25 : 50;
+          } else {
+            // Inverse polarity: Hot US inflation or jobs -> USD rally -> Bearish Gold
+            eventRiskVal = act > fcast ? 25 : act < fcast ? 75 : 50;
+          }
         }
       } else if (diffMins >= 0 && diffMins <= 30) {
+        // Imminent event locks conviction to prevent front-running volatility spikes
         eventRiskVal = 50;
         imminentEventWarning = `${nextHigh.title} in ${diffMins}m`;
+      } else {
+        // Ambient surprise drift from recent completed releases
+        const completedToday = upcoming.filter((e) => e.actual && e.forecast && e.impact === 'HIGH');
+        if (completedToday.length > 0) {
+          let hawkishUSDCount = 0;
+          let dovishUSDCount = 0;
+          completedToday.forEach((ev) => {
+            const a = parseFloat(ev.actual);
+            const f = parseFloat(ev.forecast);
+            if (!isNaN(a) && !isNaN(f)) {
+              if (a > f) hawkishUSDCount++;
+              else if (a < f) dovishUSDCount++;
+            }
+          });
+          if (hawkishUSDCount > dovishUSDCount) eventRiskVal = 40;
+          else if (dovishUSDCount > hawkishUSDCount) eventRiskVal = 60;
+        }
       }
     }
 
-    // 5. COT Institutional Positioning & Retail Contrarian Flow (0-100)
-    let cotVal = 50;
+    // ─── 5. COT Institutional Positioning & Real-Time Retail Flow (0-100) ──
     const mmBias = cotData?.managedMoney?.biasPct || 87.1;
     const retailLong = cotData?.retailSentiment?.longPct || 62;
-    if (mmBias >= 80) cotVal += 15;
-    else if (mmBias <= 50) cotVal -= 15;
 
-    if (retailLong <= 45) cotVal += 15;
-    else if (retailLong >= 65) cotVal -= 15;
-    cotVal = Math.max(0, Math.min(100, cotVal));
+    // Managed Money institutional trend contribution (50% = neutral)
+    const instContribution = (mmBias - 50) * 0.35;
 
-    // Weighted Composite Score (100% total)
+    // Retail contrarian contrarian flow: crowd heavily long = smart money sell liquidity
+    const crowdContrarian = (50 - retailLong) * 0.65;
+
+    const cotVal = Math.max(0, Math.min(100, Math.round(50 + instContribution + crowdContrarian)));
+
+    // ─── Weighted Composite Score (100% total) ──────────────────────────────
     const composite = Math.max(
       0,
       Math.min(

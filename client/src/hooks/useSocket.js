@@ -113,6 +113,9 @@ export function useSocket() {
       setNewsFeed((prev) =>
         prev.map((item) => (item.id === updatedItem.id ? { ...item, ...updatedItem } : item))
       );
+      if (updatedItem.impact === 'HIGH') {
+        setLatestAlert(updatedItem);
+      }
     };
 
     const onCalendarUpdate = (data) => {

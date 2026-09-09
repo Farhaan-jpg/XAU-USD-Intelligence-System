@@ -834,9 +834,9 @@ function tick() {
 
     countdownFormatted = d > 0 ? `${d}d ${h}h ${m}m ${s}s` : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 
-    // T-5 min alert (between 4m 50s and 5m 10s)
+    // T-5 min alert (within 5 minutes of release)
     const minutesLeft = countdownMs / (60 * 1000);
-    if (minutesLeft <= 5.0 && minutesLeft >= 4.5 && !alertedEvents.has(nextEvent.id) && nextEvent.impact === 'HIGH') {
+    if (minutesLeft <= 5.0 && minutesLeft >= 0.2 && !alertedEvents.has(nextEvent.id) && nextEvent.impact === 'HIGH') {
       alertedEvents.add(nextEvent.id);
       console.log(`[CALENDAR] 🚨 T-5min alert for HIGH impact event: ${nextEvent.title} (${nextEvent.currency})`);
       telegramEngine.sendCalendarAlert(nextEvent);

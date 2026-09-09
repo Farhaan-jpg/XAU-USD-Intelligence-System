@@ -76,12 +76,13 @@ function processItemInstantly(rawItem) {
   }
 
   const score = relevanceScore(rawItem.title, rawItem.summary);
+  const initialImpact = score >= 30 ? 'HIGH' : score >= 15 ? 'MED' : 'LOW';
 
-  // 1. INSTANT NEUTRAL BASELINE (NO HARDCODED KEYWORD RULES LIKE 'WAR')
+  // 1. INSTANT HEURISTIC BASELINE (UPDATED ASYNCHRONOUSLY BY AI MODEL)
   const newsItem = {
     id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
     ...rawItem,
-    impact: 'LOW',
+    impact: initialImpact,
     bias: 'NEUTRAL',
     reasoning: 'Evaluating via AI sentiment model...',
     model: 'evaluating-ai',

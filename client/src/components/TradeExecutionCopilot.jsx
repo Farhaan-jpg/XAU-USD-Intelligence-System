@@ -43,10 +43,13 @@ export default function TradeExecutionCopilot({
 
   // Compute Full 5-Pillar Institutional Signal Plan
   const plan = useMemo(() => {
-    const goldChg = parseFloat(gold.change5m || 0);
-    const dxyChg = parseFloat(dxy.change5m || 0);
-    const us10yChg = parseFloat(us10y.change5m || 0);
-    const silverChg = parseFloat(silver.change5m || 0);
+    const goldChg5m = parseFloat(gold.change5m || 0);
+    const goldChgDay = parseFloat(gold.changeDay || 0);
+    const dxyChg5m = parseFloat(dxy.change5m || 0);
+    const dxyChgDay = parseFloat(dxy.changeDay || 0);
+    const us10yChg5m = parseFloat(us10y.change5m || 0);
+    const us10yChgDay = parseFloat(us10y.changeDay || 0);
+    const silverChg5m = parseFloat(silver.change5m || 0);
 
     // 1. Check Calendar Lockup (< 20 mins to HIGH impact event)
     let isNewsLockup = false;
@@ -82,9 +85,12 @@ export default function TradeExecutionCopilot({
     const bullishOB = goldLow + range * 0.08;
     const bearishOB = goldHigh - range * 0.08;
 
-    // 4. Macro Alignment
-    const macroBullish = dxyChg < -0.02 && us10yChg < -0.02;
-    const macroBearish = dxyChg > 0.02 && us10yChg > 0.02;
+    // 4. Macro Alignment (Blended 5m impulse & day trend)
+    const dxyImpulse = (dxyChg5m * 0.65) + (dxyChgDay * 0.35);
+    const us10yImpulse = (us10yChg5m * 0.65) + (us10yChgDay * 0.35);
+
+    const macroBullish = dxyImpulse < -0.015 || (dxyImpulse < 0 && us10yImpulse < 0);
+    const macroBearish = dxyImpulse > 0.015 || (dxyImpulse > 0 && us10yImpulse > 0);
 
     // 5. Composite Score Calculation
     let bullPoints = 0;
@@ -93,8 +99,8 @@ export default function TradeExecutionCopilot({
     if (macroBullish) bullPoints += 25;
     else if (macroBearish) bearPoints += 25;
 
-    if (silverChg > goldChg + 0.04) bullPoints += 15;
-    else if (silverChg < goldChg - 0.04) bearPoints += 15;
+    if (silverChg5m > goldChg5m + 0.03) bullPoints += 15;
+    else if (silverChg5m < goldChg5m - 0.03) bearPoints += 15;
 
     // News Sentiment
     const recent = newsFeed.slice(0, 15);
@@ -190,8 +196,8 @@ export default function TradeExecutionCopilot({
       },
       {
         name: 'Macro Drivers Confirmed',
-        pass: action === 'BUY' ? macroBullish || dxyChg < 0 : action === 'SELL' ? macroBearish || dxyChg > 0 : false,
-        desc: `DXY: ${dxyChg >= 0 ? '+' : ''}${dxyChg.toFixed(2)}% | 10Y: ${us10yChg >= 0 ? '+' : ''}${us10yChg.toFixed(2)}%`,
+        pass: action === 'BUY' ? macroBullish || dxyImpulse < 0 : action === 'SELL' ? macroBearish || dxyImpulse > 0 : false,
+        desc: `DXY: ${dxyChg5m >= 0 ? '+' : ''}${dxyChg5m.toFixed(2)}% (5m) / ${dxyChgDay >= 0 ? '+' : ''}${dxyChgDay.toFixed(2)}% (Day) | 10Y: ${us10yChg5m >= 0 ? '+' : ''}${us10yChg5m.toFixed(2)}%`,
       },
       {
         name: 'Confluence Alignment',
