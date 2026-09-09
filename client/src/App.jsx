@@ -9,7 +9,6 @@ import ConfluenceMeter from './components/ConfluenceMeter';
 import MacroRadar from './components/MacroRadar';
 import AIMarketGuidance from './components/AIMarketGuidance';
 import SessionClock from './components/SessionClock';
-import RiskCalculator from './components/RiskCalculator';
 import NewsTerminal from './components/NewsTerminal';
 import EconomicCalendar from './components/EconomicCalendar';
 import SettingsModal from './components/SettingsModal';
@@ -25,7 +24,6 @@ import {
   Radar,
   Newspaper,
   Calendar,
-  Calculator,
   AlertTriangle,
   Target,
   Award,
@@ -211,14 +209,6 @@ export default function App() {
           <Calendar size={15} />
           <span>CALENDAR</span>
         </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'CALCULATOR' ? 'active' : ''}`}
-          onClick={() => setActiveTab('CALCULATOR')}
-        >
-          <Calculator size={15} />
-          <span>RISK & LOTS</span>
-        </button>
       </nav>
 
       {/* Main Workspace Content */}
@@ -251,7 +241,7 @@ export default function App() {
             {/* Post-News Volatility Trap Detector */}
             <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
 
-            {/* Institutional Trade Execution Copilot (A+ Setup Engine) */}
+            {/* Institutional Trade Execution Copilot (A+ Setup Engine & Custom Risk Suite) */}
             <TradeExecutionCopilot
               prices={prices}
               newsFeed={newsFeed}
@@ -259,17 +249,14 @@ export default function App() {
               cotData={cotData}
             />
 
-            {/* Top Grid: TradingView Chart & Confluence Bias Meter */}
+            {/* Top Grid: TradingView Chart & Confluence Bias Meter + Smart Liquidity */}
             <div className="grid-terminal-top">
               <TradingChart prices={prices} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
-                <RiskCalculator currentGoldPrice={currentGoldPrice} />
+                <SmartLiquidityRadar prices={prices} />
               </div>
             </div>
-
-            {/* Smart Liquidity & Order Block Radar (ICT / SMC) */}
-            <SmartLiquidityRadar prices={prices} />
 
             {/* Middle Section: Macro Correlation Radar */}
             <MacroRadar prices={prices} />
@@ -312,7 +299,7 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <AIMarketGuidance prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
-            <RiskCalculator currentGoldPrice={currentGoldPrice} />
+            <SmartLiquidityRadar prices={prices} />
           </div>
         )}
 
@@ -355,13 +342,6 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <EconomicCalendar calendarData={calendarData} />
             <SessionClock />
-          </div>
-        )}
-
-        {/* Tab 8: Risk & Lot Calculator Focus */}
-        {activeTab === 'CALCULATOR' && (
-          <div style={{ maxWidth: '800px', margin: '20px auto', width: '100%' }}>
-            <RiskCalculator currentGoldPrice={currentGoldPrice} />
           </div>
         )}
       </main>

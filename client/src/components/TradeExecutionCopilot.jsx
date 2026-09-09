@@ -1,6 +1,6 @@
 // client/src/components/TradeExecutionCopilot.jsx
-// Institutional Trade Execution Copilot & A+ Setup Signal Engine
-// Synthesizes Confluence, SMC Liquidity Pools, Macro Radar, Calendar Lockups, and Volatility Traps into actionable trade plans
+// Institutional Trade Execution Copilot & Custom Capital Defense Suite
+// Synthesizes Confluence, SMC Liquidity Pools, Macro Radar, Custom Drawdown Rules, and News Lockups into actionable trade plans
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
@@ -18,103 +18,12 @@ import {
   DollarSign,
   TrendingUp,
   Percent,
-  Award,
+  Sliders,
   Lock,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
-
-export const PROP_FIRM_PROFILES = [
-  {
-    id: 'FTMO',
-    name: 'FTMO Challenge / Verification',
-    shortName: 'FTMO',
-    dailyLossPct: 5.0,
-    maxLossPct: 10.0,
-    recommendedRiskPct: 0.5,
-    maxSafeRiskPct: 1.0,
-    newsRule: 'Strict: No opening/closing 2 min before & after Red News (Swing accounts exempt)',
-    newsBufferMins: 2,
-    profitTargetPhase1Pct: 10.0,
-    profitTargetPhase2Pct: 5.0,
-    defaultBalances: [10000, 25000, 50000, 100000, 200000],
-    badgeColor: '#38bdf8',
-  },
-  {
-    id: 'FUNDING_PIPS',
-    name: 'Funding Pips (Student / Pro)',
-    shortName: 'Funding Pips',
-    dailyLossPct: 4.0,
-    maxLossPct: 8.0,
-    recommendedRiskPct: 0.35,
-    maxSafeRiskPct: 0.75,
-    newsRule: 'High Strictness: 2 min news restriction on high-impact events',
-    newsBufferMins: 2,
-    profitTargetPhase1Pct: 8.0,
-    profitTargetPhase2Pct: 5.0,
-    defaultBalances: [5000, 10000, 25000, 50000, 100000],
-    badgeColor: '#a855f7',
-  },
-  {
-    id: 'THE_5ERS',
-    name: 'The 5%ers (High Stakes / Bootcamp)',
-    shortName: 'The 5%ers',
-    dailyLossPct: 5.0,
-    maxLossPct: 10.0,
-    recommendedRiskPct: 0.5,
-    maxSafeRiskPct: 1.0,
-    newsRule: 'News trading permitted with slippage risk disclaimer',
-    newsBufferMins: 0,
-    profitTargetPhase1Pct: 8.0,
-    profitTargetPhase2Pct: 5.0,
-    defaultBalances: [10000, 20000, 60000, 100000, 250000],
-    badgeColor: '#10b981',
-  },
-  {
-    id: 'FUNDED_NEXT',
-    name: 'FundedNext (Stellar / Evaluation)',
-    shortName: 'FundedNext',
-    dailyLossPct: 5.0,
-    maxLossPct: 10.0,
-    recommendedRiskPct: 0.5,
-    maxSafeRiskPct: 1.0,
-    newsRule: 'Permitted on Stellar; 15 min lockup on Express challenges',
-    newsBufferMins: 2,
-    profitTargetPhase1Pct: 8.0,
-    profitTargetPhase2Pct: 5.0,
-    defaultBalances: [6000, 15000, 25000, 50000, 100000, 200000],
-    badgeColor: '#f59e0b',
-  },
-  {
-    id: 'APEX_TOPSTEP',
-    name: 'Apex / Topstep (Futures Evaluation)',
-    shortName: 'Apex / Topstep',
-    dailyLossPct: 4.5,
-    maxLossPct: 6.0,
-    recommendedRiskPct: 0.35,
-    maxSafeRiskPct: 0.75,
-    newsRule: 'Trading halt strictly enforced during Tier-1 FOMC/CPI releases',
-    newsBufferMins: 5,
-    profitTargetPhase1Pct: 6.0,
-    profitTargetPhase2Pct: 6.0,
-    defaultBalances: [25000, 50000, 100000, 150000, 250000],
-    badgeColor: '#ec4899',
-  },
-  {
-    id: 'PERSONAL',
-    name: 'Personal / Unrestricted Broker Account',
-    shortName: 'Personal Account',
-    dailyLossPct: 10.0,
-    maxLossPct: 20.0,
-    recommendedRiskPct: 1.0,
-    maxSafeRiskPct: 2.0,
-    newsRule: 'Unrestricted discretionary execution',
-    newsBufferMins: 0,
-    profitTargetPhase1Pct: 15.0,
-    profitTargetPhase2Pct: 15.0,
-    defaultBalances: [1000, 5000, 10000, 25000, 50000],
-    badgeColor: 'var(--gold-glow)',
-  },
-];
 
 export default function TradeExecutionCopilot({
   prices = {},
@@ -122,22 +31,16 @@ export default function TradeExecutionCopilot({
   calendarData = {},
   cotData = {},
 }) {
-  const [selectedPropFirm, setSelectedPropFirm] = useState('FTMO');
-  const [accountBalance, setAccountBalance] = useState(100000); // 100k standard evaluation default
-  const [riskPercent, setRiskPercent] = useState(0.5); // 0.5% conservative prop safe default
+  // User-defined manual account & capital defense state
+  const [accountBalance, setAccountBalance] = useState(100000);
+  const [profitTargetPct, setProfitTargetPct] = useState(8.0);
+  const [maxDailyLossPct, setMaxDailyLossPct] = useState(4.0);
+  const [maxTotalDrawdownPct, setMaxTotalDrawdownPct] = useState(8.0);
+  const [riskPercent, setRiskPercent] = useState(0.5);
+  const [newsLockupMins, setNewsLockupMins] = useState(15);
+
   const [copied, setCopied] = useState(false);
   const [isSquawking, setIsSquawking] = useState(false);
-
-  const activeFirm = PROP_FIRM_PROFILES.find((f) => f.id === selectedPropFirm) || PROP_FIRM_PROFILES[0];
-
-  const handlePropFirmChange = (firmId) => {
-    setSelectedPropFirm(firmId);
-    const firm = PROP_FIRM_PROFILES.find((f) => f.id === firmId) || PROP_FIRM_PROFILES[0];
-    setRiskPercent(firm.recommendedRiskPct);
-    if (!firm.defaultBalances.includes(accountBalance)) {
-      setAccountBalance(firm.defaultBalances[firm.defaultBalances.length > 3 ? 3 : 0] || 100000);
-    }
-  };
 
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const dxy = prices['DX-Y.NYB'] || {};
@@ -148,7 +51,7 @@ export default function TradeExecutionCopilot({
   const goldHigh = parseFloat(gold.high || spotPrice + 12);
   const goldLow = parseFloat(gold.low || spotPrice - 12);
 
-  // Compute Full 5-Pillar Institutional Signal Plan
+  // Compute Full Institutional Signal Plan & Custom Defense Guardrails
   const plan = useMemo(() => {
     const goldChg5m = parseFloat(gold.change5m || 0);
     const goldChgDay = parseFloat(gold.changeDay || 0);
@@ -158,17 +61,17 @@ export default function TradeExecutionCopilot({
     const us10yChgDay = parseFloat(us10y.changeDay || 0);
     const silverChg5m = parseFloat(silver.change5m || 0);
 
-    // 1. Check Calendar Lockup (< 20 mins to HIGH impact event)
+    // 1. Check Calendar Lockup against user-defined newsLockupMins
     let isNewsLockup = false;
     let newsLockupReason = '';
     const upcoming = calendarData?.events || calendarData?.upcomingEvents || [];
     const nextHigh = upcoming.find((e) => e.impact === 'HIGH');
-    if (nextHigh) {
+    if (nextHigh && newsLockupMins > 0) {
       const eventTime = new Date(nextHigh.date || nextHigh.timeUTC).getTime();
       const diffMins = Math.round((eventTime - Date.now()) / 60000);
-      if (diffMins >= 0 && diffMins <= 20) {
+      if (diffMins >= 0 && diffMins <= newsLockupMins) {
         isNewsLockup = true;
-        newsLockupReason = `${nextHigh.title} (${nextHigh.currency}) releases in ${diffMins}m. High slippage lockup active.`;
+        newsLockupReason = `${nextHigh.title} (${nextHigh.currency}) releases in ${diffMins}m. Custom news buffer lockup active.`;
       }
     }
 
@@ -244,9 +147,33 @@ export default function TradeExecutionCopilot({
 
     if (isNewsLockup) {
       action = 'STAND_ASIDE';
-      grade = 'LOCKUP ACTIVE';
-      rationale = newsLockupReason;
-      winProb = 35;
+      grade = 'HIGH IMPACT NEWS LOCKUP';
+      rationale = `${newsLockupReason} Capital protection rule enforced. Avoid entering trades within your custom ${newsLockupMins}m news buffer.`;
+      winProb = 20;
+    } else if (netScore >= 65 && spotPrice >= bullishOB && spotPrice <= eq) {
+      action = 'BUY';
+      grade = 'A+ INSTITUTIONAL SETUP';
+      entry = spotPrice;
+      const slDist = Math.max(5.0, (entry - ssl) * 0.55);
+      sl = parseFloat((entry - slDist).toFixed(2));
+      const risk = entry - sl;
+      tp1 = parseFloat((entry + risk * 2.0).toFixed(2));
+      tp2 = parseFloat((entry + risk * 3.5).toFixed(2));
+      rrRatio = parseFloat((((tp1 - entry) + (tp2 - entry)) / 2 / risk).toFixed(1));
+      winProb = 88;
+      rationale = `Triple Confluence: Macro Dollar & Yields retreating, institutional discount demand pool at $${bullishOB.toFixed(2)}, and BSL target at $${bsl.toFixed(2)}.`;
+    } else if (netScore <= -65 && spotPrice <= bearishOB && spotPrice >= eq) {
+      action = 'SELL';
+      grade = 'A+ INSTITUTIONAL SETUP';
+      entry = spotPrice;
+      const slDist = Math.max(5.0, (bsl - entry) * 0.55);
+      sl = parseFloat((entry + slDist).toFixed(2));
+      const risk = sl - entry;
+      tp1 = parseFloat((entry - risk * 2.0).toFixed(2));
+      tp2 = parseFloat((entry - risk * 3.5).toFixed(2));
+      rrRatio = parseFloat((((entry - tp1) + (entry - tp2)) / 2 / risk).toFixed(1));
+      winProb = 87;
+      rationale = `Triple Confluence: Macro Dollar surging, institutional supply premium pool at $${bearishOB.toFixed(2)}, and SSL target at $${ssl.toFixed(2)}.`;
     } else if (netScore >= 40 && spotPrice < bsl - 4) {
       action = 'BUY';
       grade = netScore >= 60 ? 'A+ INSTITUTIONAL SETUP' : 'B VALID SETUP';
@@ -278,8 +205,8 @@ export default function TradeExecutionCopilot({
       winProb = 48;
     }
 
-    // Exact Lot Size Calculation based on $ Risk
-    const dollarRisk = (accountBalance * (riskPercent / 100));
+    // Mathematical Position Sizing & User-Defined Defense Guardrails
+    const dollarRisk = accountBalance * (riskPercent / 100);
     const slPipsOrDollars = Math.abs(entry - sl);
     // 1 standard lot of gold = 100 oz. $1 move in gold on 1.00 lot = $100 profit/loss.
     const calculatedLot = slPipsOrDollars > 0 ? parseFloat((dollarRisk / (slPipsOrDollars * 100)).toFixed(2)) : 0.01;
@@ -289,25 +216,17 @@ export default function TradeExecutionCopilot({
     const gainTP2 = parseFloat((Math.abs(tp2 - entry) * 100 * (lotSize * 0.5)).toFixed(2));
     const totalGain = parseFloat((gainTP1 + gainTP2).toFixed(2));
 
-    // Prop Firm Rules, Drawdown Buffers & Target Projections
-    const maxDailyLoss = (accountBalance * (activeFirm.dailyLossPct / 100)).toFixed(2);
-    const maxTotalLoss = (accountBalance * (activeFirm.maxLossPct / 100)).toFixed(2);
-    const profitTargetPhase1 = (accountBalance * (activeFirm.profitTargetPhase1Pct / 100)).toFixed(2);
-    const profitTargetPhase2 = (accountBalance * (activeFirm.profitTargetPhase2Pct / 100)).toFixed(2);
-    const isRiskOverLimit = riskPercent > activeFirm.maxSafeRiskPct;
-    const firmNewsRestricted = isNewsLockup && activeFirm.newsBufferMins > 0;
-    const drawdownLossesBuffer = dollarRisk > 0 ? Math.floor(parseFloat(maxDailyLoss) / dollarRisk) : 0;
-    const tradeGainPctOfTarget = totalGain > 0 ? ((totalGain / parseFloat(profitTargetPhase1)) * 100).toFixed(1) : '0.0';
+    // Custom Account Capital Defense Limits
+    const dailyLossLimit = accountBalance * (maxDailyLossPct / 100);
+    const maxTotalDrawdown = accountBalance * (maxTotalDrawdownPct / 100);
+    const profitTargetAmount = accountBalance * (profitTargetPct / 100);
 
-    // Override guidance if strict prop firm news lockup is triggered
-    if (firmNewsRestricted && action !== 'STAND_ASIDE') {
-      action = 'STAND_ASIDE';
-      grade = 'PROP NEWS LOCKUP ACTIVE';
-      rationale = `${activeFirm.shortName} Rule Enforcement: High-impact release within lockup window. Stand aside to prevent account breach.`;
-      winProb = 30;
-    }
+    const drawdownLossesBuffer = dollarRisk > 0 ? Math.floor(dailyLossLimit / dollarRisk) : 0;
+    const tradeGainPctOfTarget = profitTargetAmount > 0 ? ((totalGain / profitTargetAmount) * 100).toFixed(1) : '0.0';
+    const dailyLossPctConsumed = dailyLossLimit > 0 ? ((maxLoss / dailyLossLimit) * 100).toFixed(1) : '0.0';
+    const isRiskTooHighForDailyDD = dollarRisk > dailyLossLimit * 0.33; // Elevated risk if single trade consumes > 33% of daily limit
 
-    // 6-Pillar Verification Checklist (Including Prop Firm Capital Defense)
+    // 6-Pillar Live Pre-Flight Trade & Capital Defense Checklist
     const pillars = [
       {
         name: 'Session Liquidity',
@@ -317,7 +236,7 @@ export default function TradeExecutionCopilot({
       {
         name: 'News Lockup Safe',
         pass: !isNewsLockup,
-        desc: isNewsLockup ? newsLockupReason : 'No Red-Folder releases in next 20m',
+        desc: isNewsLockup ? newsLockupReason : `No Red-Folder releases within ${newsLockupMins}m`,
       },
       {
         name: 'Macro Drivers Confirmed',
@@ -335,13 +254,11 @@ export default function TradeExecutionCopilot({
         desc: `Average R:R: 1:${rrRatio || '2.0'}`,
       },
       {
-        name: `${activeFirm.shortName} Capital Defense`,
-        pass: !isRiskOverLimit && !firmNewsRestricted,
-        desc: isRiskOverLimit
-          ? `Risk ${riskPercent}% exceeds safe limit (${activeFirm.maxSafeRiskPct}% max)`
-          : firmNewsRestricted
-          ? `News restriction active (${activeFirm.shortName})`
-          : `${drawdownLossesBuffer} stop-outs allowed before daily limit ($${parseFloat(maxDailyLoss).toLocaleString()})`,
+        name: 'Capital Defense Guardrail',
+        pass: !isRiskTooHighForDailyDD && drawdownLossesBuffer >= 3,
+        desc: isRiskTooHighForDailyDD
+          ? `High Risk: Consumes ${dailyLossPctConsumed}% of daily limit (${drawdownLossesBuffer} stop-outs)`
+          : `${drawdownLossesBuffer} stop-outs allowed before daily limit ($${dailyLossLimit.toLocaleString()})`,
       },
     ];
 
@@ -364,17 +281,32 @@ export default function TradeExecutionCopilot({
       totalGain,
       pillars,
       isNewsLockup,
-      firm: activeFirm,
-      maxDailyLoss,
-      maxTotalLoss,
-      profitTargetPhase1,
-      profitTargetPhase2,
-      isRiskOverLimit,
-      firmNewsRestricted,
+      dailyLossLimit,
+      maxTotalDrawdown,
+      profitTargetAmount,
       drawdownLossesBuffer,
       tradeGainPctOfTarget,
+      dailyLossPctConsumed,
+      isRiskTooHighForDailyDD,
     };
-  }, [spotPrice, goldHigh, goldLow, gold, dxy, us10y, silver, newsFeed, calendarData, cotData, accountBalance, riskPercent, selectedPropFirm, activeFirm]);
+  }, [
+    spotPrice,
+    goldHigh,
+    goldLow,
+    gold,
+    dxy,
+    us10y,
+    silver,
+    newsFeed,
+    calendarData,
+    cotData,
+    accountBalance,
+    profitTargetPct,
+    maxDailyLossPct,
+    maxTotalDrawdownPct,
+    riskPercent,
+    newsLockupMins,
+  ]);
 
   // Auto squawk when an A+ setup is generated (Strict 10-minute cooldown)
   const prevActionRef = useRef(plan.action);
@@ -407,9 +339,9 @@ export default function TradeExecutionCopilot({
     setIsSquawking(true);
     let speech = '';
     if (plan.action === 'STAND_ASIDE') {
-      speech = `${activeFirm.shortName} Copilot recommendation: Stand aside. ${plan.rationale}`;
+      speech = `Copilot recommendation: Stand aside. ${plan.rationale}`;
     } else {
-      speech = `Trade recommendation for ${activeFirm.shortName} Account. Action: ${plan.action} Gold at ${plan.entry.toFixed(2)} dollars. Stop loss: ${plan.sl.toFixed(2)}. Target one: ${plan.tp1.toFixed(2)}. Position size: ${plan.lotSize} lots, risking ${riskPercent} percent or ${plan.dollarRisk} dollars. Allowed drawdown buffer: ${plan.drawdownLossesBuffer} stop outs.`;
+      speech = `Trade recommendation for ${accountBalance.toLocaleString()} dollar account. Action: ${plan.action} Gold at ${plan.entry.toFixed(2)} dollars. Stop loss: ${plan.sl.toFixed(2)}. Target one: ${plan.tp1.toFixed(2)}. Position size: ${plan.lotSize} lots, risking ${riskPercent} percent or ${plan.dollarRisk} dollars. Daily loss limit: ${plan.dailyLossLimit.toLocaleString()} dollars with ${plan.drawdownLossesBuffer} stop outs buffer.`;
     }
     speakSquawk(speech, { priority: true, cooldownSeconds: 0 });
     setTimeout(() => setIsSquawking(false), 3000);
@@ -418,7 +350,8 @@ export default function TradeExecutionCopilot({
   // Copy Order to Clipboard
   const handleCopyOrder = () => {
     const text = `=== XAU/USD INSTITUTIONAL TRADE ORDER ===
-PROP FIRM PROFILE: ${activeFirm.name}
+ACCOUNT CONFIGURATION: Custom Capital Defense
+ACCOUNT BALANCE: $${accountBalance.toLocaleString()}
 ACTION: ${plan.action} (XAU/USD)
 ORDER TYPE: LIMIT / MARKET
 GRADE: ${plan.grade}
@@ -426,10 +359,11 @@ ENTRY: $${plan.entry.toFixed(2)}
 STOP LOSS: $${plan.sl.toFixed(2)} (-$${plan.riskDistance})
 TAKE PROFIT 1: $${plan.tp1.toFixed(2)} (1:2.0 R:R)
 TAKE PROFIT 2: $${plan.tp2.toFixed(2)} (1:3.4+ R:R)
-LOT SIZE: ${plan.lotSize} LOTS (${riskPercent}% Risk on $${accountBalance.toLocaleString()} ${activeFirm.shortName})
-MAX DOLLAR RISK: -$${plan.maxLoss}
-ESTIMATED PROFIT: +$${plan.totalGain} (${plan.tradeGainPctOfTarget}% of Phase 1 Target)
-DAILY DD CEILING: -$${parseFloat(plan.maxDailyLoss).toLocaleString()} (${activeFirm.dailyLossPct}%)
+LOT SIZE: ${plan.lotSize} LOTS (${riskPercent}% Risk on $${accountBalance.toLocaleString()})
+MAX CASH AT RISK: -$${plan.maxLoss} (${plan.dailyLossPctConsumed}% of Daily Loss Limit)
+PROJECTED PROFIT: +$${plan.totalGain} (${plan.tradeGainPctOfTarget}% of Target)
+DAILY LOSS LIMIT: -$${plan.dailyLossLimit.toLocaleString()} (${maxDailyLossPct}%)
+MAX TOTAL DRAWDOWN: -$${plan.maxTotalDrawdown.toLocaleString()} (${maxTotalDrawdownPct}%)
 DRAWDOWN BUFFER: ${plan.drawdownLossesBuffer} consecutive stop-outs
 WIN PROBABILITY: ${plan.winProb}%
 RATIONALE: ${plan.rationale}`;
@@ -451,56 +385,60 @@ RATIONALE: ${plan.rationale}`;
 
   return (
     <div
-      className="panel-card"
       style={{
-        border: `1px solid ${isBuy ? 'var(--border-bull)' : isSell ? 'var(--border-bear)' : 'var(--border-gold)'}`,
-        background: isBuy
-          ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, var(--bg-card) 40%)'
-          : isSell
-          ? 'linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, var(--bg-card) 40%)'
-          : 'var(--bg-card)',
-        padding: '16px',
+        background: 'linear-gradient(145deg, rgba(15, 23, 38, 0.95), rgba(10, 15, 24, 0.98))',
+        border: `1px solid ${isStandAside ? 'var(--border-medium)' : themeColor}`,
+        borderRadius: 'var(--radius-lg)',
+        padding: '20px',
+        boxShadow: isStandAside ? '0 8px 32px rgba(0, 0, 0, 0.5)' : `0 0 30px ${isBuy ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: '18px',
       }}
     >
-      {/* Top Header Row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* Header Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: 'var(--radius-md)',
               background: isBuy ? 'var(--bull-bg)' : isSell ? 'var(--bear-bg)' : 'var(--gold-bg)',
-              color: themeColor,
-              padding: '8px',
-              borderRadius: 'var(--radius-sm)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: `1px solid ${themeColor}`,
             }}
           >
-            {isBuy ? <ArrowUpRight size={22} /> : isSell ? <ArrowDownRight size={22} /> : <Scale size={22} />}
+            {isBuy ? (
+              <ArrowUpRight size={22} style={{ color: 'var(--bull-glow)' }} />
+            ) : isSell ? (
+              <ArrowDownRight size={22} style={{ color: 'var(--bear-glow)' }} />
+            ) : (
+              <Zap size={22} style={{ color: 'var(--gold-glow)' }} />
+            )}
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 800, color: '#fff', letterSpacing: '0.5px' }}>
-                INSTITUTIONAL TRADE EXECUTION COPILOT
-              </span>
+              <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>
+                INSTITUTIONAL EXECUTION COPILOT
+              </h2>
               <span
-                className="event-impact-badge"
+                className="telemetry-badge"
                 style={{
-                  background: isBuy ? 'var(--bull-bg)' : isSell ? 'var(--bear-bg)' : 'rgba(245, 158, 11, 0.15)',
+                  fontSize: '11px',
+                  fontWeight: 800,
                   color: themeColor,
                   borderColor: themeColor,
-                  fontWeight: 800,
-                  fontSize: '11px',
+                  background: 'rgba(0, 0, 0, 0.4)',
                 }}
               >
                 {plan.grade}
               </span>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Real-time multi-factor algorithmic execution engine with calculated risk-to-reward parameters.
+              Real-time multi-factor execution engine with dynamic capital preservation and custom drawdown limits.
             </div>
           </div>
         </div>
@@ -516,13 +454,14 @@ RATIONALE: ${plan.rationale}`;
               alignItems: 'center',
               gap: '6px',
               fontSize: '12px',
-              padding: '6px 12px',
+              padding: '6px 14px',
               borderColor: 'var(--gold-glow)',
               color: 'var(--gold-glow)',
+              cursor: 'pointer',
             }}
           >
-            <Volume2 size={13} />
-            <span>{isSquawking ? 'Squawking Plan...' : '🔊 Squawk Trade Plan'}</span>
+            <Volume2 size={14} />
+            <span>{isSquawking ? 'Squawking Plan...' : '🔊 Voice Squawk'}</span>
           </button>
 
           <button
@@ -536,10 +475,11 @@ RATIONALE: ${plan.rationale}`;
               fontSize: '12px',
               padding: '6px 14px',
               background: isBuy ? 'var(--bull-primary)' : isSell ? 'var(--bear-primary)' : undefined,
+              cursor: isStandAside ? 'not-allowed' : 'pointer',
             }}
           >
-            {copied ? <Check size={13} /> : <Copy size={13} />}
-            <span>{copied ? 'Copied to Clipboard!' : '📋 Copy Broker Order'}</span>
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            <span>{copied ? 'Copied to Clipboard!' : '📋 Copy Trade Order'}</span>
           </button>
         </div>
       </div>
@@ -548,9 +488,9 @@ RATIONALE: ${plan.rationale}`;
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: '12px',
-          background: 'rgba(0, 0, 0, 0.35)',
+          background: 'rgba(0, 0, 0, 0.4)',
           padding: '14px',
           borderRadius: 'var(--radius-md)',
           border: '1px solid var(--border-subtle)',
@@ -650,232 +590,453 @@ RATIONALE: ${plan.rationale}`;
         <strong>Algorithmic Rationale:</strong> {plan.rationale}
       </div>
 
-      {/* Interactive Capital Risk & Exact Lot Sizer with Prop Firm Dropdown */}
+      {/* CUSTOM ACCOUNT & CAPITAL DEFENSE SUITE */}
       <div
         style={{
           background: 'rgba(15, 23, 38, 0.75)',
-          border: `1px solid ${plan.isRiskOverLimit ? 'var(--bear-glow)' : 'var(--border-medium)'}`,
+          border: `1px solid ${plan.isRiskTooHighForDailyDD ? 'var(--bear-glow)' : 'var(--border-medium)'}`,
           borderRadius: 'var(--radius-md)',
-          padding: '14px',
+          padding: '16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: '16px',
         }}
       >
+        {/* Panel Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', fontWeight: 800, color: '#fff', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Percent size={14} style={{ color: 'var(--gold-glow)' }} />
-              DYNAMIC POSITION SIZER & PROFIT PROJECTOR
-            </span>
-            <span
-              className="telemetry-badge"
-              style={{
-                fontSize: '10px',
-                fontWeight: 800,
-                color: activeFirm.badgeColor,
-                borderColor: activeFirm.badgeColor,
-                background: 'rgba(0, 0, 0, 0.4)',
-              }}
-            >
-              {activeFirm.shortName.toUpperCase()} MODE
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sliders size={16} style={{ color: 'var(--gold-glow)' }} />
+            <span style={{ fontSize: '13px', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              CUSTOM ACCOUNT PARAMETERS & CAPITAL DEFENSE
             </span>
           </div>
-
-          {/* Quick Account Sizing Presets for Selected Firm */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Account Size:</span>
-            {activeFirm.defaultBalances.map((amt) => (
-              <button
-                key={amt}
-                className={`filter-pill ${accountBalance === amt ? 'active' : ''}`}
-                style={{ fontSize: '10px', padding: '2px 8px' }}
-                onClick={() => setAccountBalance(amt)}
-              >
-                ${amt >= 1000 ? `${(amt / 1000).toFixed(0)}k` : amt}
-              </button>
-            ))}
-          </div>
+          <span
+            style={{
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              background: 'rgba(245, 158, 11, 0.12)',
+              color: 'var(--gold-glow)',
+              border: '1px solid var(--border-gold)',
+              fontWeight: 700,
+            }}
+          >
+            MANUAL RISK CONFIGURATION
+          </span>
         </div>
 
-        {/* Inputs Grid with Prop Firm Selector */}
-        <div className="calc-inputs-grid" style={{ gridTemplateColumns: '1.4fr 1.1fr 1fr 1fr 1fr 1.1fr', gap: '10px' }}>
-          <div className="calc-field">
-            <label className="calc-label" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: activeFirm.badgeColor }}>
-              <Award size={12} />
-              PROP FIRM ACCOUNT
-            </label>
-            <select
-              className="calc-input"
-              value={selectedPropFirm}
-              onChange={(e) => handlePropFirmChange(e.target.value)}
-              style={{ borderColor: activeFirm.badgeColor, fontWeight: 700 }}
-            >
-              {PROP_FIRM_PROFILES.map((firm) => (
-                <option key={firm.id} value={firm.id}>
-                  {firm.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="calc-field">
-            <label className="calc-label">ACCOUNT BALANCE ($)</label>
-            <input
-              type="number"
-              className="calc-input"
-              value={accountBalance}
-              onChange={(e) => setAccountBalance(Math.max(100, parseFloat(e.target.value) || 100))}
-            />
-          </div>
-
-          <div className="calc-field">
-            <label className="calc-label">RISK PER TRADE (%)</label>
-            <select
-              className="calc-input"
-              value={riskPercent}
-              onChange={(e) => setRiskPercent(parseFloat(e.target.value))}
-              style={{
-                borderColor: plan.isRiskOverLimit ? 'var(--bear-glow)' : undefined,
-                color: plan.isRiskOverLimit ? 'var(--bear-glow)' : undefined,
-                fontWeight: 700,
-              }}
-            >
-              <option value="0.25">0.25% (Ultra Safe / Capital Defense)</option>
-              <option value="0.35">0.35% (Funding Pips Conservative)</option>
-              <option value="0.5">0.5% (Recommended Prop Safe)</option>
-              <option value="0.75">0.75% (Moderate Evaluation)</option>
-              <option value="1.0">1.0% (Standard Prop Maximum)</option>
-              <option value="1.5">1.5% (High Drawdown Risk)</option>
-              <option value="2.0">2.0% (Personal Account Only)</option>
-            </select>
-          </div>
-
-          <div className="calc-field">
-            <label className="calc-label">RECOMMENDED LOTS</label>
-            <div className="calc-result-box" style={{ padding: '8px', fontSize: '15px', fontWeight: 800, color: 'var(--gold-glow)' }}>
-              {isStandAside ? '0.00' : `${plan.lotSize} Lots`}
-            </div>
-          </div>
-
-          <div className="calc-field">
-            <label className="calc-label">MAX DOLLAR RISK</label>
-            <div className="calc-result-box" style={{ padding: '8px', fontSize: '15px', fontWeight: 800, color: 'var(--bear-glow)' }}>
-              {isStandAside ? '$0.00' : `-$${plan.maxLoss}`}
-            </div>
-          </div>
-
-          <div className="calc-field">
-            <label className="calc-label">TOTAL PROFIT (TP1+TP2)</label>
-            <div className="calc-result-box" style={{ padding: '8px', fontSize: '15px', fontWeight: 800, color: 'var(--bull-glow)' }}>
-              {isStandAside ? '$0.00' : `+$${plan.totalGain}`}
-            </div>
-          </div>
-        </div>
-
-        {/* Prop Firm Guardrails & Drawdown Telemetry Strip */}
+        {/* Tier 1: User-Defined Manual Input Parameter Grid */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-            gap: '8px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: '12px',
+          }}
+        >
+          {/* 1. Account Balance */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              Account Balance ($)
+            </label>
+            <input
+              type="number"
+              value={accountBalance}
+              onChange={(e) => setAccountBalance(Math.max(100, parseFloat(e.target.value) || 100))}
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 'var(--radius-sm)',
+                color: '#fff',
+                padding: '8px 10px',
+                fontSize: '13px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
+              {[10000, 25000, 50000, 100000, 200000].map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => setAccountBalance(amt)}
+                  style={{
+                    fontSize: '9px',
+                    padding: '2px 5px',
+                    borderRadius: '3px',
+                    background: accountBalance === amt ? 'var(--gold-glow)' : 'rgba(255, 255, 255, 0.05)',
+                    color: accountBalance === amt ? '#000' : 'var(--text-muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                  }}
+                >
+                  ${amt >= 1000 ? `${amt / 1000}k` : amt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Profit Target (%) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--bull-glow)', textTransform: 'uppercase' }}>
+              Profit Target (%)
+            </label>
+            <input
+              type="number"
+              step="0.5"
+              value={profitTargetPct}
+              onChange={(e) => setProfitTargetPct(Math.max(0.5, parseFloat(e.target.value) || 1))}
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid var(--border-bull)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--bull-glow)',
+                padding: '8px 10px',
+                fontSize: '13px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
+              {[5.0, 8.0, 10.0, 15.0].map((pct) => (
+                <button
+                  key={pct}
+                  onClick={() => setProfitTargetPct(pct)}
+                  style={{
+                    fontSize: '9px',
+                    padding: '2px 5px',
+                    borderRadius: '3px',
+                    background: profitTargetPct === pct ? 'var(--bull-glow)' : 'rgba(255, 255, 255, 0.05)',
+                    color: profitTargetPct === pct ? '#000' : 'var(--text-muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                  }}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Max Loss Per Day (%) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--bear-glow)', textTransform: 'uppercase' }}>
+              Max Loss Per Day (%)
+            </label>
+            <input
+              type="number"
+              step="0.5"
+              value={maxDailyLossPct}
+              onChange={(e) => setMaxDailyLossPct(Math.max(0.5, parseFloat(e.target.value) || 1))}
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid var(--border-bear)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--bear-glow)',
+                padding: '8px 10px',
+                fontSize: '13px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
+              {[3.0, 4.0, 5.0, 6.0].map((pct) => (
+                <button
+                  key={pct}
+                  onClick={() => setMaxDailyLossPct(pct)}
+                  style={{
+                    fontSize: '9px',
+                    padding: '2px 5px',
+                    borderRadius: '3px',
+                    background: maxDailyLossPct === pct ? 'var(--bear-glow)' : 'rgba(255, 255, 255, 0.05)',
+                    color: maxDailyLossPct === pct ? '#fff' : 'var(--text-muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                  }}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Max Total Drawdown (%) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--bear-glow)', textTransform: 'uppercase' }}>
+              Max Total Drawdown (%)
+            </label>
+            <input
+              type="number"
+              step="0.5"
+              value={maxTotalDrawdownPct}
+              onChange={(e) => setMaxTotalDrawdownPct(Math.max(1.0, parseFloat(e.target.value) || 1))}
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid var(--border-bear)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--bear-glow)',
+                padding: '8px 10px',
+                fontSize: '13px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
+              {[6.0, 8.0, 10.0, 12.0].map((pct) => (
+                <button
+                  key={pct}
+                  onClick={() => setMaxTotalDrawdownPct(pct)}
+                  style={{
+                    fontSize: '9px',
+                    padding: '2px 5px',
+                    borderRadius: '3px',
+                    background: maxTotalDrawdownPct === pct ? 'var(--bear-glow)' : 'rgba(255, 255, 255, 0.05)',
+                    color: maxTotalDrawdownPct === pct ? '#fff' : 'var(--text-muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                  }}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 5. Risk Per Trade (%) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gold-glow)', textTransform: 'uppercase' }}>
+              Risk Per Trade (%)
+            </label>
+            <select
+              value={riskPercent}
+              onChange={(e) => setRiskPercent(parseFloat(e.target.value))}
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: `1px solid ${plan.isRiskTooHighForDailyDD ? 'var(--bear-glow)' : 'var(--border-gold)'}`,
+                borderRadius: 'var(--radius-sm)',
+                color: plan.isRiskTooHighForDailyDD ? 'var(--bear-glow)' : 'var(--gold-glow)',
+                padding: '8px 10px',
+                fontSize: '13px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                outline: 'none',
+              }}
+            >
+              <option value="0.25">0.25% (Ultra Defensive)</option>
+              <option value="0.35">0.35% (Conservative)</option>
+              <option value="0.5">0.50% (Recommended Balanced)</option>
+              <option value="0.75">0.75% (Moderate Aggression)</option>
+              <option value="1.0">1.00% (High Volatility Risk)</option>
+              <option value="1.5">1.50% (Aggressive)</option>
+              <option value="2.0">2.00% (Maximum Cap)</option>
+            </select>
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
+              ${(accountBalance * (riskPercent / 100)).toFixed(2)} cash risk
+            </span>
+          </div>
+
+          {/* 6. News Lockup Buffer */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--cyan-glow)', textTransform: 'uppercase' }}>
+              News Buffer (Mins)
+            </label>
+            <select
+              value={newsLockupMins}
+              onChange={(e) => setNewsLockupMins(parseInt(e.target.value, 10))}
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid var(--cyan-glow)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--cyan-glow)',
+                padding: '8px 10px',
+                fontSize: '13px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                outline: 'none',
+              }}
+            >
+              <option value="0">0m (News Trading Allowed)</option>
+              <option value="5">5 Mins Before/After</option>
+              <option value="10">10 Mins Before/After</option>
+              <option value="15">15 Mins (Recommended)</option>
+              <option value="30">30 Mins (High Caution)</option>
+            </select>
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
+              Stand aside on Tier-1 events
+            </span>
+          </div>
+        </div>
+
+        {/* Tier 2: Output Telemetry Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: '10px',
             background: 'rgba(0, 0, 0, 0.4)',
-            padding: '10px 12px',
+            padding: '12px',
             borderRadius: 'var(--radius-sm)',
             border: '1px solid var(--border-subtle)',
           }}
         >
+          {/* Recommended Lots */}
           <div>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Max Daily Loss ({activeFirm.dailyLossPct}%)
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              Recommended Lot Size
             </div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--bear-glow)', fontFamily: 'var(--font-mono)' }}>
-              -${parseFloat(plan.maxDailyLoss).toLocaleString()}
+            <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--gold-glow)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+              {isStandAside ? '0.00' : `${plan.lotSize} Lots`}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              100 oz contract sizer
             </div>
           </div>
 
+          {/* Max Cash At Risk */}
           <div>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Max Total Drawdown ({activeFirm.maxLossPct}%)
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              Max Cash At Risk
             </div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--bear-glow)', fontFamily: 'var(--font-mono)' }}>
-              -${parseFloat(plan.maxTotalLoss).toLocaleString()}
+            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--bear-glow)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+              {isStandAside ? '$0.00' : `-$${plan.maxLoss}`}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              {plan.dailyLossPctConsumed}% of Daily Limit
             </div>
           </div>
 
+          {/* Profit Potential */}
           <div>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Drawdown Buffer
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              Profit Potential (TP1+TP2)
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--bull-glow)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+              {isStandAside ? '$0.00' : `+$${plan.totalGain}`}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              {plan.tradeGainPctOfTarget}% of Target (${plan.profitTargetAmount.toLocaleString()})
+            </div>
+          </div>
+
+          {/* Daily Loss Ceiling */}
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              Daily Loss Limit ({maxDailyLossPct}%)
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--bear-glow)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+              -${plan.dailyLossLimit.toLocaleString()}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              Max allowable daily loss
+            </div>
+          </div>
+
+          {/* Max Total Drawdown */}
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              Max Drawdown ({maxTotalDrawdownPct}%)
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--bear-glow)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+              -${plan.maxTotalDrawdown.toLocaleString()}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              Total account breaker
+            </div>
+          </div>
+
+          {/* Drawdown Buffer */}
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              Drawdown Defense Buffer
             </div>
             <div
               style={{
-                fontSize: '13px',
-                fontWeight: 800,
+                fontSize: '16px',
+                fontWeight: 900,
                 color: plan.drawdownLossesBuffer >= 6 ? 'var(--bull-glow)' : plan.drawdownLossesBuffer >= 3 ? 'var(--gold-glow)' : 'var(--bear-glow)',
                 fontFamily: 'var(--font-mono)',
-              }}
-            >
-              {plan.drawdownLossesBuffer} Stop-Outs Allowed
-            </div>
-          </div>
-
-          <div>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Target Phase 1 ({activeFirm.profitTargetPhase1Pct}%)
-            </div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--bull-glow)', fontFamily: 'var(--font-mono)' }}>
-              +${parseFloat(plan.profitTargetPhase1).toLocaleString()} ({plan.tradeGainPctOfTarget}%/trade)
-            </div>
-          </div>
-
-          <div>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              News Trading Restriction
-            </div>
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: plan.firmNewsRestricted ? 'var(--bear-glow)' : 'var(--bull-glow)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
                 marginTop: '2px',
               }}
             >
-              {plan.firmNewsRestricted ? <Lock size={12} /> : null}
-              {plan.firmNewsRestricted ? 'LOCKUP ACTIVE (STAND ASIDE)' : 'SAFE (NO RED FOLDERS)'}
+              {plan.drawdownLossesBuffer} Stop-Outs
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              Consecutive trades buffer
             </div>
           </div>
         </div>
 
-        {/* Warning if risk exceeds firm safety cap */}
-        {plan.isRiskOverLimit && (
+        {/* Tier 3: Advisory Warnings & Defense Feedback */}
+        {plan.isRiskTooHighForDailyDD ? (
           <div
             style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid var(--border-bear)',
               borderRadius: 'var(--radius-sm)',
-              padding: '8px 12px',
-              fontSize: '11px',
+              padding: '10px 14px',
+              fontSize: '12px',
               color: 'var(--bear-glow)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
             }}
           >
-            <AlertTriangle size={14} />
+            <AlertTriangle size={16} />
             <span>
-              <strong>Prop Firm Warning:</strong> {riskPercent}% risk per trade exceeds {activeFirm.shortName}'s recommended safety cap ({activeFirm.maxSafeRiskPct}% max). A 2-trade drawdown will consume {((2 * riskPercent / activeFirm.dailyLossPct) * 100).toFixed(0)}% of your daily limit.
+              <strong>Capital Defense Warning:</strong> Risk of {riskPercent}% per trade is high relative to your {maxDailyLossPct}% daily loss limit. A string of 2 stop-outs would consume {((2 * riskPercent / maxDailyLossPct) * 100).toFixed(0)}% of your allowed daily loss limit. Consider lowering risk to 0.35% - 0.50% for optimal capital defense.
+            </span>
+          </div>
+        ) : plan.isNewsLockup ? (
+          <div
+            style={{
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid var(--border-bear)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 14px',
+              fontSize: '12px',
+              color: 'var(--bear-glow)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <Lock size={16} />
+            <span>
+              <strong>News Lockup Active:</strong> A high-impact economic release is scheduled within your {newsLockupMins}-minute buffer. Execution is halted to protect your account against spread widening and slippage.
+            </span>
+          </div>
+        ) : (
+          <div
+            style={{
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid var(--border-bull)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '8px 12px',
+              fontSize: '11px',
+              color: 'var(--bull-glow)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <CheckCircle2 size={14} />
+            <span>
+              <strong>Capital Defense Approved:</strong> Risk configuration adheres to institutional risk management guidelines with a {plan.drawdownLossesBuffer}-trade daily drawdown buffer.
             </span>
           </div>
         )}
       </div>
 
-      {/* 6-Pillar Live Pre-Flight Trade & Prop Firm Safety Checklist */}
+      {/* 6-Pillar Live Pre-Flight Trade & Capital Defense Checklist */}
       <div>
         <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-          6-PILLAR PRE-FLIGHT TRADE & PROP FIRM VALIDATION CHECKLIST
+          6-PILLAR PRE-FLIGHT TRADE VALIDATION CHECKLIST
         </span>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
           {plan.pillars.map((pillar, idx) => (
