@@ -96,7 +96,17 @@ Analyze the gold (XAU/USD) trading impact of this news item.`;
       const raw = response.data.choices?.[0]?.message?.content;
       if (!raw) throw new Error('Empty response from model');
 
-      const parsed = JSON.parse(raw);
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (match) {
+          parsed = JSON.parse(match[0]);
+        } else {
+          throw new Error('Could not parse JSON from model output');
+        }
+      }
 
       // Validate required fields
       if (!parsed.impact || !parsed.bias || !parsed.reasoning) {

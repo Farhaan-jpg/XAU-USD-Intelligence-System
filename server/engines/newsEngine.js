@@ -5,7 +5,8 @@
 const Parser = require('rss-parser');
 const config = require('../config');
 const { isGoldRelevant, relevanceScore } = require('../utils/goldFilter');
-const { scoreNewsItem, keywordFallback } = require('../utils/openrouter');
+const aiOrchestrator = require('../utils/aiOrchestrator');
+const { keywordFallback } = require('../utils/openrouter');
 const telegramEngine = require('./telegramEngine');
 
 const parser = new Parser({
@@ -108,14 +109,15 @@ function processItemInstantly(rawItem) {
   }
 
   // 4. ASYNCHRONOUS BACKGROUND AI REFINEMENT (FIRE & FORGET)
-  // If an AI model is configured and responsive, enhance the reasoning in background
-  scoreNewsItem(rawItem.title, rawItem.summary, rawItem.source)
+  // Priority: Google Gemini -> OpenRouter Fallback -> Quant Heuristic
+  aiOrchestrator.scoreNewsItem(rawItem.title, rawItem.summary, rawItem.source)
     .then((aiSentiment) => {
-      if (aiSentiment && aiSentiment.model && !aiSentiment.model.includes('fallback')) {
+      if (aiSentiment && aiSentiment.reasoning) {
         newsItem.reasoning = aiSentiment.reasoning || newsItem.reasoning;
         newsItem.impact = aiSentiment.impact || newsItem.impact;
         newsItem.bias = aiSentiment.bias || newsItem.bias;
         newsItem.model = aiSentiment.model;
+        newsItem.provider = aiSentiment.provider;
         if (io) {
           io.emit('news_item_update', newsItem);
         }

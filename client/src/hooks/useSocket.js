@@ -95,6 +95,12 @@ export function useSocket() {
       });
     };
 
+    const onNewsItemUpdate = (updatedItem) => {
+      setNewsFeed((prev) =>
+        prev.map((item) => (item.id === updatedItem.id ? { ...item, ...updatedItem } : item))
+      );
+    };
+
     const onCalendarUpdate = (data) => {
       setCalendarData(data);
     };
@@ -103,6 +109,7 @@ export function useSocket() {
     socket.on('disconnect', onDisconnect);
     socket.on('price_update', onPriceUpdate);
     socket.on('news_item', onNewsItem);
+    socket.on('news_item_update', onNewsItemUpdate);
     socket.on('news_batch', onNewsBatch);
     socket.on('calendar_update', onCalendarUpdate);
 
@@ -117,6 +124,7 @@ export function useSocket() {
       socket.off('disconnect', onDisconnect);
       socket.off('price_update', onPriceUpdate);
       socket.off('news_item', onNewsItem);
+      socket.off('news_item_update', onNewsItemUpdate);
       socket.off('news_batch', onNewsBatch);
       socket.off('calendar_update', onCalendarUpdate);
       if (pingTimerRef.current) clearInterval(pingTimerRef.current);

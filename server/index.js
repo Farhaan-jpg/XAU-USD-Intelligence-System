@@ -14,7 +14,7 @@ const priceEngine = require('./engines/priceEngine');
 const newsEngine = require('./engines/newsEngine');
 const calendarEngine = require('./engines/calendarEngine');
 const telegramEngine = require('./engines/telegramEngine');
-const { updateConfig: updateOpenRouterConfig } = require('./utils/openrouter');
+const aiOrchestrator = require('./utils/aiOrchestrator');
 const fs = require('fs');
 
 // ─── App setup ───────────────────────────────────────────────────────────────
@@ -62,10 +62,71 @@ app.get('/api/calendar', (req, res) => {
   res.json(calendarEngine.getData());
 });
 
+// AI Endpoints
+app.get('/api/ai/models', (req, res) => {
+  res.json(aiOrchestrator.getSystemTelemetry());
+});
+
+app.post('/api/ai/copilot', async (req, res) => {
+  try {
+    const prices = priceEngine.getLatest();
+    const gold = prices['GC=F'] || {};
+    const dxy = prices['DX-Y.NYB'] || {};
+    const us10y = prices['^TNX'] || {};
+    const silver = prices['SI=F'] || {};
+    const recentNews = newsEngine.getLatest().slice(0, 5).map((n) => n.headline || n.title);
+    const calendarData = calendarEngine.getData();
+    const nextEvent = (calendarData?.upcomingEvents || []).find((e) => e.impact === 'HIGH');
+
+    const goldPrice = parseFloat(gold.price || 2350);
+    const silverPrice = parseFloat(silver.price || 30);
+    const gsr = silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '80.0';
+
+    const marketData = {
+      goldPrice: goldPrice.toFixed(2),
+      goldChange5m: gold.change5m || 0,
+      dxyPrice: dxy.price || '105.20',
+      dxyChange5m: dxy.change5m || 0,
+      us10yPrice: us10y.price || '4.35',
+      silverPrice: silverPrice.toFixed(2),
+      gsr,
+      activeSession: req.body?.activeSession || 'London/NY Overlap',
+      recentHeadlines: recentNews,
+      nextEvent: nextEvent ? {
+        title: nextEvent.title,
+        minsUntil: Math.round((new Date(nextEvent.timeUTC).getTime() - Date.now()) / 60000),
+      } : null,
+    };
+
+    const copilot = await aiOrchestrator.getTradeCopilot(marketData);
+    res.json({ success: true, copilot, marketData });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/ai/test', async (req, res) => {
+  try {
+    const sampleHeadline = req.body?.headline || 'Fed Chair Powell signals potential 50bps rate cut amid cooling labor market';
+    const sampleSummary = req.body?.summary || 'Treasury yields decline sharply as dollar index falls toward multi-week lows.';
+    const result = await aiOrchestrator.scoreNewsItem(sampleHeadline, sampleSummary, 'Test Wire');
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Settings endpoints
 app.get('/api/settings', (req, res) => {
   const maskKey = (k) => (k ? `${k.substring(0, 8)}...${k.slice(-4)}` : '');
+  const telemetry = aiOrchestrator.getSystemTelemetry();
   res.json({
+    google: {
+      hasKey: !!config.google.apiKey,
+      maskedKey: maskKey(config.google.apiKey),
+      activeModel: telemetry.gemini?.activeModel || 'gemini-3.6-flash',
+      discoveredModels: telemetry.gemini?.discoveredModels || [],
+    },
     openrouter: {
       hasKey: !!config.openrouter.apiKey,
       maskedKey: maskKey(config.openrouter.apiKey),
@@ -77,10 +138,7 @@ app.get('/api/settings', (req, res) => {
       maskedToken: maskKey(config.telegram.token),
       chatId: config.telegram.chatId || '',
     },
-    google: {
-      hasKey: !!config.google.apiKey,
-      maskedKey: maskKey(config.google.apiKey),
-    },
+    telemetry,
     intervals: config.intervals,
     feeds: config.rssFeeds.map((f) => ({ name: f.name, url: f.url })),
   });
@@ -88,10 +146,17 @@ app.get('/api/settings', (req, res) => {
 
 app.post('/api/settings', (req, res) => {
   try {
-    const { openrouterKey, model, fallbackModel, telegramToken, telegramChatId, intervals } = req.body;
+    const { googleKey, googleModel, openrouterKey, model, fallbackModel, telegramToken, telegramChatId, intervals } = req.body;
+
+    if (googleKey || googleModel) {
+      aiOrchestrator.updateGeminiConfig({
+        apiKey: googleKey || config.google.apiKey,
+        model: googleModel,
+      });
+    }
 
     if (openrouterKey || model || fallbackModel) {
-      updateOpenRouterConfig({
+      aiOrchestrator.updateOpenRouterConfig({
         apiKey: openrouterKey || config.openrouter.apiKey,
         model: model || config.openrouter.model,
         fallbackModel: fallbackModel || config.openrouter.fallbackModel,
@@ -194,6 +259,11 @@ async function bootstrap() {
 
   // Init Telegram first so other engines can use it
   telegramEngine.init();
+
+  // Trigger Google Gemini real-time model discovery
+  aiOrchestrator.discoverModels().catch((err) => {
+    console.warn('[BOOTSTRAP] Gemini model discovery background warning:', err.message);
+  });
 
   // Init engines with Socket.io instance
   priceEngine.init(io);

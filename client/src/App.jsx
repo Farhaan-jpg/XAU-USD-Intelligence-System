@@ -1,63 +1,230 @@
-import { useState } from 'react';
+// client/src/App.jsx
+// Institutional Gold (XAU/USD) Trading Intelligence Workstation v3.0
+
+import { useState, useEffect } from 'react';
 import { useSocket } from './hooks/useSocket';
 import Header from './components/Header';
-import MarketStructure from './components/MarketStructure';
-import PriceGrid from './components/PriceGrid';
-import NewsFeed from './components/NewsFeed';
-import Calendar from './components/Calendar';
-import AlertBanner from './components/AlertBanner';
-import StatusBar from './components/StatusBar';
+import TradingChart from './components/TradingChart';
+import ConfluenceMeter from './components/ConfluenceMeter';
+import MacroRadar from './components/MacroRadar';
+import AICopilot from './components/AICopilot';
+import SessionClock from './components/SessionClock';
+import RiskCalculator from './components/RiskCalculator';
+import NewsTerminal from './components/NewsTerminal';
+import EconomicCalendar from './components/EconomicCalendar';
 import SettingsModal from './components/SettingsModal';
+import StatusBar from './components/StatusBar';
+import { playFlashAlert, playEventWarning } from './utils/audioAlerts';
+import {
+  LayoutDashboard,
+  Sparkles,
+  Radar,
+  Newspaper,
+  Calendar,
+  Calculator,
+  AlertTriangle,
+} from 'lucide-react';
 
 export default function App() {
   const { connected, latency, prices, newsFeed, calendarData, latestAlert } = useSocket();
+  const [activeTab, setActiveTab] = useState('TERMINAL'); // 'TERMINAL' | 'COPILOT' | 'MACRO' | 'NEWS' | 'CALENDAR' | 'CALCULATOR'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [aiTelemetry, setAiTelemetry] = useState({});
 
+  // Poll AI Telemetry
+  useEffect(() => {
+    const fetchTelemetry = () => {
+      fetch('/api/ai/models')
+        .then((res) => res.json())
+        .then((data) => setAiTelemetry(data))
+        .catch(() => {});
+    };
+    fetchTelemetry();
+    const timer = setInterval(fetchTelemetry, 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Audio flash when high impact news arrives
+  useEffect(() => {
+    if (latestAlert && latestAlert.impact === 'HIGH') {
+      playFlashAlert();
+    }
+  }, [latestAlert]);
+
+  // Audio warning when pre-event alert triggers
   const showAlertBanner = calendarData?.preEventAlert;
+  useEffect(() => {
+    if (showAlertBanner) {
+      playEventWarning();
+    }
+  }, [showAlertBanner]);
+
+  const gold = prices['GC=F'] || {};
+  const currentGoldPrice = parseFloat(gold.price || 2350);
 
   return (
-    <div className="app">
-      {/* Sticky Header with Settings Button */}
+    <div className="app-terminal">
+      {/* Sticky Header */}
       <Header
         connected={connected}
         latency={latency}
+        aiTelemetry={aiTelemetry}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      {/* Dashboard Grid */}
-      <main className="dashboard-grid">
+      {/* Navigation Tabs */}
+      <nav className="nav-tabs-bar">
+        <button
+          className={`tab-btn ${activeTab === 'TERMINAL' ? 'active' : ''}`}
+          onClick={() => setActiveTab('TERMINAL')}
+        >
+          <LayoutDashboard size={15} />
+          <span>TERMINAL WORKSPACE</span>
+        </button>
 
-        {/* Alert Banner — full width, only when T-5 triggered */}
+        <button
+          className={`tab-btn ${activeTab === 'COPILOT' ? 'active' : ''}`}
+          onClick={() => setActiveTab('COPILOT')}
+        >
+          <Sparkles size={15} />
+          <span>AI TRADE COPILOT</span>
+          <span className="tab-pill">GEMINI</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'MACRO' ? 'active' : ''}`}
+          onClick={() => setActiveTab('MACRO')}
+        >
+          <Radar size={15} />
+          <span>MACRO RADAR</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'NEWS' ? 'active' : ''}`}
+          onClick={() => setActiveTab('NEWS')}
+        >
+          <Newspaper size={15} />
+          <span>NEWS WIRE</span>
+          <span className="tab-pill">{newsFeed.length}</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'CALENDAR' ? 'active' : ''}`}
+          onClick={() => setActiveTab('CALENDAR')}
+        >
+          <Calendar size={15} />
+          <span>CALENDAR</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'CALCULATOR' ? 'active' : ''}`}
+          onClick={() => setActiveTab('CALCULATOR')}
+        >
+          <Calculator size={15} />
+          <span>RISK & LOTS</span>
+        </button>
+      </nav>
+
+      {/* Main Workspace Content */}
+      <main className="terminal-main">
+        {/* T-5 Min Red-Folder Event Warning Banner */}
         {showAlertBanner && (
-          <AlertBanner calendarData={calendarData} />
+          <div className="event-alert-banner">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <AlertTriangle size={20} style={{ color: 'var(--bear-glow)' }} />
+              <div>
+                <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--bear-glow)' }}>
+                  HIGH VOLATILITY WARNING &bull; T-5 MINUTES
+                </span>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
+                  [{showAlertBanner.currency}] {showAlertBanner.title} scheduled in{' '}
+                  {showAlertBanner.minutesRemaining} minutes. Expect aggressive spread widening.
+                </div>
+              </div>
+            </div>
+            <span className="event-impact-badge high">URGENT</span>
+          </div>
         )}
 
-        {/* Left column: Market Structure + Price Grid + Calendar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-          {/* Dynamic Overall Market Structure Engine */}
-          <MarketStructure prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
-          
-          {/* Correlated Instruments Live Price Grid */}
-          <PriceGrid prices={prices} />
-          
-          {/* Economic Calendar & Countdown */}
-          <Calendar calendarData={calendarData} />
-        </div>
+        {/* Tab 1: Full Institutional Terminal */}
+        {activeTab === 'TERMINAL' && (
+          <>
+            {/* Global Session Clock Strip */}
+            <SessionClock />
 
-        {/* Right column: News Feed (tall, expandable, direct links) */}
-        <NewsFeed newsFeed={newsFeed} />
+            {/* Top Grid: Trading Chart & Confluence Bias Meter */}
+            <div className="grid-terminal-top">
+              <TradingChart prices={prices} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+                <RiskCalculator currentGoldPrice={currentGoldPrice} />
+              </div>
+            </div>
 
+            {/* Bottom Grid: Macro Radar & Live News Wire */}
+            <div className="grid-terminal-bottom">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <MacroRadar prices={prices} />
+                <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <NewsTerminal newsFeed={newsFeed} />
+                <EconomicCalendar calendarData={calendarData} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Tab 2: AI Trade Copilot Focus */}
+        {activeTab === 'COPILOT' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <RiskCalculator currentGoldPrice={currentGoldPrice} />
+          </div>
+        )}
+
+        {/* Tab 3: Macro Radar Focus */}
+        {activeTab === 'MACRO' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <MacroRadar prices={prices} />
+            <SessionClock />
+            <TradingChart prices={prices} />
+          </div>
+        )}
+
+        {/* Tab 4: News Wire Focus */}
+        {activeTab === 'NEWS' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <NewsTerminal newsFeed={newsFeed} />
+          </div>
+        )}
+
+        {/* Tab 5: Economic Calendar Focus */}
+        {activeTab === 'CALENDAR' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <EconomicCalendar calendarData={calendarData} />
+            <SessionClock />
+          </div>
+        )}
+
+        {/* Tab 6: Risk & Lot Calculator Focus */}
+        {activeTab === 'CALCULATOR' && (
+          <div style={{ maxWidth: '800px', margin: '20px auto', width: '100%' }}>
+            <RiskCalculator currentGoldPrice={currentGoldPrice} />
+          </div>
+        )}
       </main>
 
-      {/* Status Bar */}
+      {/* Bottom Status Bar */}
       <StatusBar
         connected={connected}
         prices={prices}
         newsFeed={newsFeed}
-        calendarData={calendarData}
+        aiTelemetry={aiTelemetry}
       />
 
-      {/* Customization Settings Modal */}
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

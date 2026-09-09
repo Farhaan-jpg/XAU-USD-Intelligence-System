@@ -48,6 +48,7 @@ const config = {
     US10Y: '^TNX',         // 10-Year Treasury Yield
     US02Y: '^IRX',         // 2-Year Treasury (13-week used as proxy)
     USDJPY: 'JPY=X',       // USD/JPY
+    OIL: 'CL=F',           // WTI Crude Oil
   },
 
   // RSS news feed sources
