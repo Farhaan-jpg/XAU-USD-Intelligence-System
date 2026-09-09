@@ -1,21 +1,11 @@
 // client/src/components/AIMarketGuidance.jsx
-// Institutional AI Market Guidance & Volatility Risk Warnings (Zero Trade Setups)
-// Analyzes live intermarket regimes and issues real-time volatility & liquidity defense warnings
+// Institutional AI Market Guidance & Volatility Intelligence Panel with Ambient Border Accents
 
 import { useState, useEffect } from 'react';
-import {
-  Sparkles,
-  RefreshCw,
-  ShieldAlert,
-  AlertTriangle,
-  Eye,
-  Activity,
-  Volume2,
-  CheckCircle2,
-} from 'lucide-react';
+import { Sparkles, RefreshCw, Volume2, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
-export default function AIMarketGuidance({ prices = {}, newsFeed = [], calendarData = {}, activeSession = 'London/NY Overlap' }) {
+export default function AIMarketGuidance({ activeSession = 'London/NY Overlap' }) {
   const [loading, setLoading] = useState(false);
   const [guidanceData, setGuidanceData] = useState(null);
   const [error, setError] = useState(null);
@@ -44,54 +34,50 @@ export default function AIMarketGuidance({ prices = {}, newsFeed = [], calendarD
 
   useEffect(() => {
     fetchGuidance();
-    // Auto-refresh guidance periodically
-    const timer = setInterval(fetchGuidance, 45000);
+    const timer = setInterval(fetchGuidance, 60000);
     return () => clearInterval(timer);
   }, []);
 
   const handleVoiceSquawk = () => {
     if (!guidanceData) return;
     const speech = `Market Guidance Alert. Current Regime: ${guidanceData.regime || 'Active'}. Risk Level: ${guidanceData.riskLevel || 'Normal'}. ${guidanceData.guidance}. Key Warning: ${(guidanceData.warnings || [])[0] || ''}`;
-    speakSquawk(speech);
+    speakSquawk(speech, { category: 'guidance' });
   };
 
   const regime = guidanceData?.regime || 'ACCUMULATION';
   const riskLevel = guidanceData?.riskLevel || 'ELEVATED';
 
-  const regimeColor =
-    regime === 'EXPANSION'
-      ? 'var(--bull-glow)'
-      : regime === 'DISTRIBUTION'
-      ? 'var(--bear-glow)'
-      : 'var(--gold-glow)';
+  const isCritical = riskLevel === 'CRITICAL';
+  const isElevated = riskLevel === 'ELEVATED';
 
-  const riskColor =
-    riskLevel === 'CRITICAL'
-      ? 'var(--bear-glow)'
-      : riskLevel === 'ELEVATED'
-      ? 'var(--gold-glow)'
-      : 'var(--bull-glow)';
+  const riskColor = isCritical ? 'var(--bear-primary)' : isElevated ? 'var(--gold-primary)' : 'var(--bull-primary)';
+  const riskBg = isCritical ? 'var(--bear-bg)' : isElevated ? 'var(--gold-bg)' : 'var(--bull-bg)';
 
   return (
-    <div className="panel-card guidance-panel">
-      <div className="panel-header" style={{ flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Sparkles size={16} style={{ color: 'var(--gold-glow)' }} />
-          <span className="panel-title" style={{ letterSpacing: '0.5px' }}>
-            AI MARKET GUIDANCE & RISK WARNINGS
-          </span>
+    <div
+      className={`panel-card intelligence-panel ${isCritical ? 'risk-critical' : isElevated ? 'risk-elevated' : ''}`}
+      style={{
+        borderLeft: `3px solid ${riskColor}`,
+      }}
+    >
+      <div className="panel-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Sparkles size={13} style={{ color: 'var(--cyan-primary)' }} />
+          <span className="panel-title">AI MARKET INTELLIGENCE & VOLATILITY DEFENSE</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* Regime Badge */}
           <span
-            className="telemetry-badge"
             style={{
               fontSize: '10px',
-              fontWeight: 800,
-              color: regimeColor,
-              borderColor: regimeColor,
-              background: 'rgba(0, 0, 0, 0.4)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-main)',
             }}
           >
             REGIME: {regime}
@@ -99,156 +85,84 @@ export default function AIMarketGuidance({ prices = {}, newsFeed = [], calendarD
 
           {/* Risk Level Badge */}
           <span
-            className="telemetry-badge"
             style={{
               fontSize: '10px',
-              fontWeight: 800,
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: riskBg,
+              border: `1px solid ${riskColor}33`,
               color: riskColor,
-              borderColor: riskColor,
-              background: 'rgba(0, 0, 0, 0.4)',
             }}
           >
             RISK: {riskLevel}
           </span>
 
-          {/* Voice Squawk Button */}
+          {/* Squawk Trigger */}
           <button
             className="filter-pill"
             onClick={handleVoiceSquawk}
-            title="Listen to AI Market Guidance Squawk"
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px' }}
+            title="Audio voice readout"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <Volume2 size={13} />
+            <Volume2 size={11} />
             <span>SQUAWK</span>
           </button>
 
-          {/* Refresh Button */}
+          {/* Refresh */}
           <button
             className="filter-pill"
             onClick={fetchGuidance}
             disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <RefreshCw size={13} className={loading ? 'spin' : ''} />
+            <RefreshCw size={11} className={loading ? 'spin' : ''} />
             <span>REFRESH</span>
           </button>
         </div>
       </div>
 
-      <div className="guidance-content-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '14px', marginTop: '10px' }}>
-        {/* Left Column: Macro Guidance Narrative */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(15, 23, 38, 0.7))',
-            border: '1px solid var(--border-gold)',
-            borderRadius: 'var(--radius-md)',
-            padding: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Activity size={16} style={{ color: 'var(--gold-glow)' }} />
-            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--gold-glow)', letterSpacing: '0.5px' }}>
-              INSTITUTIONAL MACRO CONDITION
-            </span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '12px', marginTop: '2px' }}>
+        {/* Left Column: Guidance Narrative */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-main)', lineHeight: '1.6' }}>
+            {guidanceData?.guidance || 'Analyzing multi-session order flow, liquidity imbalances, and intermarket yield vectors for institutional direction...'}
           </div>
 
-          <p style={{ fontSize: '13px', lineHeight: '1.6', color: '#e2e8f0', margin: 0 }}>
-            {guidanceData?.guidance ||
-              'Intermarket flows are currently digesting Dollar Index and Treasury Yield dynamics. Monitor order flow absorption near key session liquidity levels.'}
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-              DYNAMIC INTERMARKET WATCHPOINTS
-            </span>
-            {(guidanceData?.watchpoints || [
-              'Monitor Dollar Index trajectory against gold spot ticks.',
-              'Track US 10-Year Treasury Yield real-rate pressure.',
-            ]).map((wp, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '8px',
-                  fontSize: '12px',
-                  color: 'var(--text-muted)',
-                  background: 'rgba(0, 0, 0, 0.25)',
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-sm)',
-                  borderLeft: '2px solid var(--gold-primary)',
-                }}
-              >
-                <Eye size={14} style={{ color: 'var(--gold-glow)', flexShrink: 0, marginTop: '2px' }} />
-                <span>{wp}</span>
-              </div>
-            ))}
-          </div>
+          {guidanceData?.warnings && guidanceData.warnings.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '11px', color: 'var(--gold-primary)', background: 'var(--gold-bg)', padding: '6px 10px', borderRadius: 'var(--radius-sm)' }}>
+              <ShieldAlert size={13} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span>{guidanceData.warnings[0]}</span>
+            </div>
+          )}
         </div>
 
-        {/* Right Column: Volatility & Execution Warnings */}
-        <div
-          style={{
-            background: 'rgba(239, 68, 68, 0.03)',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            borderRadius: 'var(--radius-md)',
-            padding: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldAlert size={16} style={{ color: 'var(--bear-glow)' }} />
-            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--bear-glow)', letterSpacing: '0.5px' }}>
-              CRITICAL VOLATILITY & TRAP WARNINGS
+        {/* Right Column: Key Structural Levels & Defense Protocols */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            DEFENSE PARAMETERS
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Position Sizing</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: isCritical ? 'var(--bear-primary)' : isElevated ? 'var(--gold-primary)' : 'var(--bull-primary)' }}>
+              {isCritical ? '0.25% Defensive' : isElevated ? '0.50% Standard' : '0.75% Normal'}
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {(guidanceData?.warnings || [
-              'Anticipate spread widening around scheduled high-impact releases.',
-              'Exercise caution against chasing post-news breakout exhaustion wicks.',
-            ]).map((warn, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '8px',
-                  fontSize: '12px',
-                  color: '#f87171',
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius-sm)',
-                  borderLeft: '2px solid var(--bear-glow)',
-                  lineHeight: '1.4',
-                }}
-              >
-                <AlertTriangle size={14} style={{ color: 'var(--bear-glow)', flexShrink: 0, marginTop: '2px' }} />
-                <span>{warn}</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Execution Filter</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
+              {regime === 'EXPANSION' ? 'Trend Continuations' : 'Pullbacks to EQ'}
+            </span>
           </div>
 
-          <div
-            style={{
-              marginTop: 'auto',
-              padding: '8px 10px',
-              background: 'rgba(255, 255, 255, 0.02)',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: '11px',
-              color: 'var(--text-dim)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>Model: {guidanceData?.model || 'openrouter/free'}</span>
-            <span style={{ color: 'var(--bull-glow)' }}>DEFENSIVE PROTOCOL</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Volatility Guard</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bull-primary)' }}>
+              Resting Stops Armored
+            </span>
           </div>
         </div>
       </div>

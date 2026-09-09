@@ -1,19 +1,18 @@
 // client/src/components/VolatilityTrapDetector.jsx
-// Post-News "Volatility Expansion" Reversal & Mean Reversion Detector
-// Monitors rapid gold price sweeps after high-impact events and warns against chasing fake breakouts
+// Post-News "Volatility Expansion" Reversal & Mean Reversion Detector with Ambient Border
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertCircle, Flame, ShieldAlert, ArrowRightCircle, Sparkles } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Flame, ShieldAlert, Activity } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
-export default function VolatilityTrapDetector({ prices = {}, calendarData = {} }) {
+export default function VolatilityTrapDetector({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const currentPrice = parseFloat(gold.price || 0);
 
   const priceHistory = useRef([]);
   const [trapAlert, setTrapAlert] = useState(null);
 
-  // Monitor velocity over last 30 seconds
+  // Monitor velocity over last 60 seconds
   useEffect(() => {
     if (!currentPrice) return;
     const now = Date.now();
@@ -33,23 +32,22 @@ export default function VolatilityTrapDetector({ prices = {}, calendarData = {} 
         const isUp = delta > 0;
         setTrapAlert({
           type: isUp ? 'UPSIDE_BLOWOFF' : 'DOWNSIDE_SWEEP',
-          title: isUp ? 'Aggressive Upside Liquidity Spike Detected' : 'Aggressive Downside Liquidity Sweep Detected',
+          title: isUp ? 'Aggressive Upside Spike Detected' : 'Aggressive Downside Sweep Detected',
           delta: `${isUp ? '+' : ''}${delta.toFixed(2)}`,
-          speed: `${absDelta.toFixed(1)} USD in under 60s`,
+          speed: `${absDelta.toFixed(1)} USD in <60s`,
           advice: isUp
             ? 'Caution: Chasing long here has low R:R. Watch for exhaustion wick retest or rejection back into equilibrium.'
             : 'Caution: Retail stop run in progress. Watch for smart money absorption and rapid mean-reversion reclaim.',
-          color: isUp ? 'var(--bear-glow)' : 'var(--bull-glow)',
+          color: isUp ? 'var(--bear-primary)' : 'var(--bull-primary)',
           timestamp: new Date().toLocaleTimeString(),
         });
       }
     }
   }, [currentPrice]);
 
-  // Voice Alert on rapid volatility expansion
   useEffect(() => {
     if (trapAlert) {
-      const isBear = trapAlert.title.toLowerCase().includes('dump') || trapAlert.title.toLowerCase().includes('bear');
+      const isBear = trapAlert.title.toLowerCase().includes('down') || trapAlert.title.toLowerCase().includes('bear');
       speakSquawk(
         `Volatility ${isBear ? 'Bearish' : 'Bullish'} Alert. ${trapAlert.title}. Velocity of ${trapAlert.delta} dollars in under sixty seconds. ${isBear ? 'Rapid downside sell pressure.' : 'Beware of fakeout.'}`,
         {
@@ -62,50 +60,51 @@ export default function VolatilityTrapDetector({ prices = {}, calendarData = {} 
   }, [trapAlert?.timestamp]);
 
   return (
-    <div className="panel-card" style={{ background: trapAlert ? 'rgba(239, 68, 68, 0.05)' : 'var(--bg-card)' }}>
+    <div
+      className="panel-card"
+      style={{
+        borderLeft: trapAlert ? `3px solid ${trapAlert.color}` : '1px solid var(--border-subtle)',
+        background: trapAlert ? 'rgba(244, 63, 94, 0.04)' : undefined,
+      }}
+    >
       <div className="panel-header">
         <span className="panel-title">
-          <Flame size={15} style={{ color: trapAlert ? 'var(--bear-glow)' : 'var(--gold-glow)' }} />
-          POST-NEWS VOLATILITY SPIKE & REVERSAL TRAP DETECTOR
+          <Activity size={13} style={{ color: trapAlert ? 'var(--bear-primary)' : 'var(--text-dim)' }} />
+          POST-NEWS VOLATILITY SWEEP & TRAP DETECTOR
         </span>
         <span
-          className={`event-impact-badge ${trapAlert ? 'high' : 'low'}`}
-          style={{ fontSize: '10px' }}
+          style={{
+            fontSize: '10px',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 600,
+            color: trapAlert ? 'var(--bear-primary)' : 'var(--bull-primary)',
+          }}
         >
-          {trapAlert ? 'VOLATILITY SPIKE ACTIVE' : 'CALM REGIME'}
+          {trapAlert ? 'SPIKE ACTIVE' : 'CALM REGIME (< $2.50/MIN)'}
         </span>
       </div>
 
       {trapAlert ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} style={{ color: trapAlert.color }} />
-              <span style={{ fontSize: '13px', fontWeight: 800, color: trapAlert.color }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ShieldAlert size={14} style={{ color: trapAlert.color }} />
+              <span style={{ fontSize: '12px', fontWeight: 600, color: trapAlert.color }}>
                 {trapAlert.title} ({trapAlert.delta} USD)
               </span>
             </div>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{trapAlert.timestamp}</span>
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+              {trapAlert.timestamp}
+            </span>
           </div>
-
-          <div
-            style={{
-              fontSize: '12px',
-              color: 'var(--text-muted)',
-              lineHeight: '1.5',
-              background: 'rgba(0, 0, 0, 0.25)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-sm)',
-              borderLeft: `2px solid ${trapAlert.color}`,
-            }}
-          >
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
             {trapAlert.advice}
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-dim)', padding: '6px 0' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>Monitoring real-time tick velocity for institutional fakeouts and post-news exhaustion wicks...</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bull-glow)' }}>NORMAL VOLATILITY (&lt; $2.50/min)</span>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bull-primary)' }}>NORMAL</span>
         </div>
       )}
     </div>

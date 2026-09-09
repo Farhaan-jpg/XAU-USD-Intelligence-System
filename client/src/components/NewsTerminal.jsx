@@ -1,8 +1,8 @@
 // client/src/components/NewsTerminal.jsx
-// Real-Time Multi-Wire News Aggregator with Filter Pills & AI Reasoning
+// Minimalist Financial News Wire with Impact Dots, Tabular Timestamps, and AI Reasoning
 
 import { useState, useMemo } from 'react';
-import { Newspaper, ExternalLink, Copy, Check, Filter, Sparkles, Radio, Volume2 } from 'lucide-react';
+import { Newspaper, Copy, Check, Volume2 } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
 export default function NewsTerminal({ newsFeed = [] }) {
@@ -29,13 +29,14 @@ export default function NewsTerminal({ newsFeed = [] }) {
   const handleCopy = (item) => {
     const text = `[${item.impact || 'MED'}] ${item.headline || item.title}\nSignal: ${item.bias || 'NEUTRAL'} | ${item.reasoning || ''}`;
     navigator.clipboard.writeText(text).catch(() => {});
-    setCopiedId(item.id);
+    setCopiedId(item.id || item.guid || item.headline);
     setTimeout(() => setCopiedId(null), 1500);
   };
 
   const handleManualSquawk = (item) => {
-    setSquawkingId(item.id || item.guid || item.headline);
-    speakSquawk(`${item.headline || item.title}. Market bias: ${item.bias || 'Neutral'}. ${item.reasoning || ''}`, {
+    const key = item.id || item.guid || item.headline;
+    setSquawkingId(key);
+    speakSquawk(`${item.headline || item.title}. Bias: ${item.bias || 'Neutral'}. ${item.reasoning || ''}`, {
       category: 'news',
       preChime: 'flash',
       priority: true,
@@ -56,11 +57,10 @@ export default function NewsTerminal({ newsFeed = [] }) {
     <div className="panel-card panel-card-flex" style={{ height: '100%' }}>
       <div className="panel-header">
         <span className="panel-title">
-          <Newspaper size={15} />
+          <Newspaper size={13} />
           REAL-TIME FINANCIAL & MACRO WIRE
         </span>
 
-        {/* Filter Pills */}
         <div className="filter-pills-row">
           {filters.map((f) => (
             <button
@@ -74,95 +74,88 @@ export default function NewsTerminal({ newsFeed = [] }) {
         </div>
       </div>
 
-      {/* News Items List */}
+      {/* News Feed Chronological List */}
       <div className="news-feed-container">
         {filteredNews.length === 0 ? (
-          <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-dim)' }}>
-            No news matching the current filter. Live news scanner listening for incoming ticks...
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-dim)' }}>
+            No news matching active filter. Listening for real-time institutional feeds...
           </div>
         ) : (
           filteredNews.map((item) => {
             const headline = item.headline || item.title || '';
             const isHigh = item.impact === 'HIGH';
+            const isMed = item.impact === 'MED';
             const isBull = item.bias === 'BULLISH';
             const isBear = item.bias === 'BEARISH';
-
-            const providerLabel = item.provider || (item.model?.includes('gemini') ? 'Google Gemini' : item.model?.includes('fallback') ? 'Quant Engine' : 'OpenRouter');
+            const itemKey = item.id || item.guid || headline;
 
             return (
               <div
-                key={item.id || item.guid || headline}
-                className={`news-card-item ${isHigh ? 'high-impact' : ''}`}
+                key={itemKey}
+                className={`news-row-item ${isHigh ? 'high-impact' : ''}`}
               >
-                {/* Meta row */}
-                <div className="news-card-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="news-source-tag">{item.source || 'Wire'}</span>
-                    <span
-                      className={`event-impact-badge ${
-                        item.impact === 'HIGH' ? 'high' : item.impact === 'MED' ? 'med' : 'low'
-                      }`}
-                    >
-                      {item.impact || 'MED'}
+                {/* Meta Row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className={`impact-dot ${isHigh ? 'high' : isMed ? 'med' : 'low'}`} />
+                    <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                      {item.source || 'Wire'}
                     </span>
                     <span
-                      className="event-impact-badge"
                       style={{
-                        background: isBull ? 'var(--bull-bg)' : isBear ? 'var(--bear-bg)' : 'rgba(107, 114, 128, 0.15)',
-                        color: isBull ? 'var(--bull-glow)' : isBear ? 'var(--bear-glow)' : 'var(--text-dim)',
-                        borderColor: isBull ? 'var(--border-bull)' : isBear ? 'var(--border-bear)' : 'transparent',
+                        fontSize: '9px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 600,
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        background: isBull ? 'var(--bull-bg)' : isBear ? 'var(--bear-bg)' : 'rgba(255,255,255,0.04)',
+                        color: isBull ? 'var(--bull-primary)' : isBear ? 'var(--bear-primary)' : 'var(--text-dim)',
                       }}
                     >
                       {item.bias || 'NEUTRAL'}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span className="news-time-tag">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
                       {item.publishedAt ? new Date(item.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
                     <button
-                      className={`btn-icon ${squawkingId === (item.id || item.guid || headline) ? 'active' : ''}`}
-                      style={{ width: '24px', height: '24px' }}
+                      className="btn-ghost-icon"
+                      style={{ width: '22px', height: '22px' }}
                       onClick={() => handleManualSquawk(item)}
-                      title="Audio Squawk (Indian Female Voice)"
+                      title="Audio squawk"
                     >
-                      <Volume2 size={12} style={{ color: squawkingId === (item.id || item.guid || headline) ? 'var(--gold-glow)' : undefined }} />
+                      <Volume2 size={11} style={{ color: squawkingId === itemKey ? 'var(--cyan-primary)' : undefined }} />
                     </button>
                     <button
-                      className="btn-icon"
-                      style={{ width: '24px', height: '24px' }}
+                      className="btn-ghost-icon"
+                      style={{ width: '22px', height: '22px' }}
                       onClick={() => handleCopy(item)}
-                      title="Copy Headline & Signal"
+                      title="Copy headline"
                     >
-                      {copiedId === item.id ? <Check size={12} style={{ color: 'var(--bull-glow)' }} /> : <Copy size={12} />}
+                      {copiedId === itemKey ? <Check size={11} style={{ color: 'var(--bull-primary)' }} /> : <Copy size={11} />}
                     </button>
                   </div>
                 </div>
 
                 {/* Headline */}
-                <a
-                  href={item.link || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="news-card-title"
-                >
+                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-main)', lineHeight: '1.4' }}>
                   {headline}
-                </a>
+                </div>
 
-                {/* AI Reasoning Box */}
+                {/* AI Reasoning Strip if present */}
                 {item.reasoning && (
-                  <div className="news-ai-box">
-                    <div style={{ lineHeight: '1.4' }}>{item.reasoning}</div>
-                    <div className="news-ai-meta">
-                      <span style={{ color: 'var(--gold-glow)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Sparkles size={11} />
-                        {providerLabel}
-                      </span>
-                      {item.relevanceScore && (
-                        <span style={{ color: 'var(--text-dim)' }}>Relevance: {item.relevanceScore}/10</span>
-                      )}
-                    </div>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                      borderLeft: '2px solid rgba(255,255,255,0.08)',
+                      paddingLeft: '6px',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {item.reasoning}
                   </div>
                 )}
               </div>
@@ -171,24 +164,20 @@ export default function NewsTerminal({ newsFeed = [] }) {
         )}
       </div>
 
-      {/* Terminal Footer Strip to anchor bottom with zero dead space */}
       <div
         style={{
           borderTop: '1px solid var(--border-subtle)',
-          paddingTop: '8px',
+          paddingTop: '6px',
           marginTop: 'auto',
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '11px',
+          fontSize: '10px',
           color: 'var(--text-dim)',
+          fontFamily: 'var(--font-mono)',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Radio size={12} style={{ color: 'var(--bull-glow)' }} />
-          <span>SCANNING 9 LIVE WIRE FEEDS</span>
-        </span>
-        <span>SHOWING {filteredNews.length} ITEMS</span>
+        <span>STREAMING DISPATCH</span>
+        <span>{filteredNews.length} WIRE HEADLINES</span>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 // client/src/components/Header.jsx
-// Terminal Top Header with Real-Time Telemetry, Active AI Provider, and Audio Controls
+// 48px High-Density Minimalist Institutional Header with Integrated Workspace Tabs & Telemetry
 
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -8,9 +8,14 @@ import {
   Settings,
   Clock,
   Sparkles,
-  Sliders,
   Check,
   ChevronDown,
+  LayoutDashboard,
+  Radar,
+  Newspaper,
+  Calendar,
+  Target,
+  Award,
 } from 'lucide-react';
 import {
   isMuted,
@@ -24,6 +29,9 @@ export default function Header({
   latency = null,
   aiTelemetry = {},
   onOpenSettings,
+  activeTab = 'TERMINAL',
+  setActiveTab = () => {},
+  newsCount = 0,
 }) {
   const [audioMuted, setAudioMuted] = useState(isMuted());
   const [utcTime, setUtcTime] = useState('');
@@ -36,7 +44,7 @@ export default function Header({
     const updateTime = () => {
       const now = new Date();
       setUtcTime(
-        now.toISOString().replace('T', ' ').substring(11, 19) + ' UTC'
+        now.toISOString().substring(11, 19) + ' UTC'
       );
     };
     updateTime();
@@ -67,9 +75,6 @@ export default function Header({
     setVoiceSettings({ ...next });
   };
 
-  const activeModel = aiTelemetry?.gemini?.activeModel || 'gemini-3.6-flash';
-  const provider = aiTelemetry?.activeProvider || 'google';
-
   const channels = [
     { key: 'news', label: 'Breaking News Alerts', icon: '📢' },
     { key: 'calendar', label: 'Economic Calendar Warnings', icon: '📅' },
@@ -81,214 +86,173 @@ export default function Header({
     { key: 'guidance', label: 'AI Market Guidance & Regimes', icon: '🧠' },
   ];
 
+  const tabs = [
+    { id: 'TERMINAL', label: 'TERMINAL', icon: LayoutDashboard },
+    { id: 'GUIDANCE', label: 'AI GUIDANCE', icon: Sparkles },
+    { id: 'MACRO', label: 'MACRO RADAR', icon: Radar },
+    { id: 'NEWS', label: 'NEWS WIRE', icon: Newspaper, count: newsCount },
+    { id: 'LIQUIDITY', label: 'LIQUIDITY', icon: Target },
+    { id: 'COT', label: 'COT POSITIONING', icon: Award },
+    { id: 'CALENDAR', label: 'CALENDAR', icon: Calendar },
+  ];
+
   return (
-    <header className="terminal-header" style={{ position: 'relative' }}>
-      {/* Brand & Market Identity */}
+    <header className="terminal-header">
+      {/* Left: Sleek Icon + Brand + v3.0 Badge */}
       <div className="header-brand">
         <div className="brand-icon">Au</div>
-        <div>
-          <div className="brand-title">
-            XAU/USD INTELLIGENCE
-            <span className="brand-badge">PRO v3.0</span>
-          </div>
+        <div className="brand-title">
+          <span>XAU/USD INTELLIGENCE</span>
+          <span className="brand-badge">v3.0</span>
         </div>
       </div>
 
-      {/* Real-time Telemetry Badges */}
-      <div className="header-telemetry">
-        {/* WebSocket Connection Status */}
-        <div className={`telemetry-badge ${connected ? 'online' : ''}`}>
-          <span className="status-dot" />
-          <span>{connected ? 'LIVE STREAM' : 'CONNECTING'}</span>
-          {latency !== null && <span>({latency}ms)</span>}
+      {/* Center: Integrated Workspace Tabs Segment Controller */}
+      <nav className="header-nav-tabs">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              className={`header-tab-btn ${isActive ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <Icon size={13} style={{ opacity: isActive ? 1 : 0.65 }} />
+              <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className="tab-count-pill">{tab.count}</span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Right: Latency, UTC Clock, Ghost Action Buttons */}
+      <div className="header-right" ref={voiceMenuRef} style={{ position: 'relative' }}>
+        {/* Latency & Connection */}
+        <div className="header-telemetry-item" title={connected ? 'WebSocket Stream Connected' : 'Connecting to Terminal Hub'}>
+          <span className={`status-dot ${connected ? 'online' : ''}`} />
+          <span>{latency !== null ? `${latency}ms` : connected ? 'LIVE' : 'CONN'}</span>
         </div>
 
-        {/* Dynamic Priority AI Model Badge */}
-        <div
-          className={`telemetry-badge ${
-            provider === 'google'
-              ? 'ai-gemini'
-              : provider === 'openrouter'
-              ? 'ai-openrouter'
-              : 'ai-quant'
-          }`}
-          title={`Active Model: ${activeModel} | Provider: ${provider.toUpperCase()}`}
-        >
-          <Sparkles size={13} />
-          <span>
-            {provider === 'google'
-              ? `GEMINI: ${activeModel.replace('gemini-', '')}`
-              : provider === 'openrouter'
-              ? 'OPENROUTER'
-              : 'QUANT ENGINE'}
-          </span>
-        </div>
-
-        {/* Global Market UTC Clock */}
-        <div className="telemetry-badge">
-          <Clock size={13} />
+        {/* UTC Clock */}
+        <div className="header-telemetry-item" style={{ color: 'var(--text-secondary)' }}>
+          <Clock size={12} style={{ opacity: 0.6 }} />
           <span>{utcTime}</span>
         </div>
-      </div>
 
-      {/* Action Controls */}
-      <div className="header-actions" ref={voiceMenuRef}>
-        {/* Quick Voice Channels Dropdown Button */}
+        {/* Voice Channels Menu Toggle Button */}
         <button
-          className={`btn-secondary ${showVoiceMenu ? 'active' : ''}`}
+          className={`btn-ghost-icon ${showVoiceMenu ? 'active' : ''}`}
           onClick={() => {
             setVoiceSettings(getVoiceSettings());
             setShowVoiceMenu(!showVoiceMenu);
           }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '11px',
-            padding: '5px 10px',
-            borderColor: showVoiceMenu ? 'var(--gold-glow)' : 'var(--border-subtle)',
-            color: showVoiceMenu ? 'var(--gold-glow)' : 'var(--text-main)',
-            cursor: 'pointer',
-          }}
-          title="Customize individual voice alert channels"
+          title="Voice channel configuration"
         >
-          <Volume2 size={13} style={{ color: audioMuted ? 'var(--text-dim)' : 'var(--gold-glow)' }} />
-          <span>Voice Alerts</span>
-          <ChevronDown size={11} />
+          <Volume2 size={15} style={{ color: audioMuted ? 'var(--text-dim)' : 'var(--cyan-primary)' }} />
         </button>
 
         {/* Master Audio Mute Button */}
         <button
-          className={`btn-icon ${audioMuted ? '' : 'active'}`}
+          className={`btn-ghost-icon ${audioMuted ? 'active' : ''}`}
           onClick={handleToggleAudio}
-          title={audioMuted ? 'Sound Alerts: OFF (Click to unmute)' : 'Sound Alerts: ON (Click to mute)'}
-          aria-label="Toggle Sound Alerts"
+          title={audioMuted ? 'Unmute voice and audio alerts' : 'Mute all audio alerts'}
         >
-          {audioMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          {audioMuted ? <VolumeX size={15} style={{ color: 'var(--bear-primary)' }} /> : <Volume2 size={15} />}
         </button>
 
-        {/* Terminal Settings Trigger */}
+        {/* Global Settings */}
         <button
-          className="btn-icon"
+          className="btn-ghost-icon"
           onClick={onOpenSettings}
           title="Terminal Settings & AI Configuration"
-          aria-label="Open Settings"
         >
-          <Settings size={16} />
+          <Settings size={15} />
         </button>
 
-        {/* Floating Quick Voice Channels Customization Popover */}
+        {/* Voice Channels Popover */}
         {showVoiceMenu && (
           <div
             style={{
               position: 'absolute',
-              top: '52px',
-              right: '20px',
-              zIndex: 9999,
-              width: '320px',
-              background: '#0d1522',
-              border: '1px solid var(--border-gold)',
-              borderRadius: '10px',
-              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7)',
-              padding: '14px',
+              top: '42px',
+              right: '0',
+              width: '280px',
+              background: '#111620',
+              border: '1px solid var(--border-medium)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.65)',
+              zIndex: 200,
+              padding: '10px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
+              gap: '6px',
             }}
           >
-            {/* Popover Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Volume2 size={14} style={{ color: 'var(--gold-glow)' }} />
-                <span style={{ fontSize: '12px', fontWeight: 800, color: '#fff', textTransform: 'uppercase' }}>
-                  Voice Alert Channels
-                </span>
-              </div>
-              <button
-                onClick={handleToggleAudio}
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  background: audioMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                  color: audioMuted ? 'var(--bear-glow)' : 'var(--bull-glow)',
-                  border: `1px solid ${audioMuted ? 'var(--border-bear)' : 'var(--border-bull)'}`,
-                  cursor: 'pointer',
-                }}
-              >
-                {audioMuted ? 'MASTER: MUTED' : 'MASTER: ACTIVE'}
-              </button>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingBottom: '6px',
+                borderBottom: '1px solid var(--border-subtle)',
+              }}
+            >
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Voice Channels
+              </span>
+              <span style={{ fontSize: '10px', color: audioMuted ? 'var(--bear-primary)' : 'var(--bull-primary)', fontWeight: 600 }}>
+                {audioMuted ? 'MUTED' : 'ACTIVE'}
+              </span>
             </div>
 
-            {/* Channels List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '340px', overflowY: 'auto' }}>
-              {channels.map(({ key, label, icon }) => {
-                const isEnabled = voiceSettings.enabledEvents && voiceSettings.enabledEvents[key] !== false;
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '280px', overflowY: 'auto' }}>
+              {channels.map((ch) => {
+                const isEnabled = voiceSettings.enabledEvents?.[ch.key] !== false;
                 return (
-                  <div
-                    key={key}
-                    onClick={() => handleChannelToggle(key)}
+                  <button
+                    key={ch.key}
+                    onClick={() => handleChannelToggle(ch.key)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '7px 10px',
-                      borderRadius: '6px',
-                      background: isEnabled ? 'rgba(245, 158, 11, 0.07)' : 'rgba(255, 255, 255, 0.02)',
-                      border: `1px solid ${isEnabled ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.05)'}`,
+                      padding: '5px 8px',
+                      borderRadius: '4px',
+                      background: isEnabled ? 'rgba(56, 189, 248, 0.05)' : 'transparent',
+                      border: '1px solid',
+                      borderColor: isEnabled ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                      color: isEnabled ? 'var(--text-main)' : 'var(--text-dim)',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease',
+                      fontSize: '11px',
+                      textAlign: 'left',
+                      transition: 'all 0.1s ease',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '13px' }}>{icon}</span>
-                      <span style={{ fontSize: '11px', fontWeight: isEnabled ? 700 : 500, color: isEnabled ? '#fff' : 'var(--text-dim)' }}>
-                        {label}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11px' }}>{ch.icon}</span>
+                      <span>{ch.label}</span>
                     </div>
-                    <span
+                    <div
                       style={{
-                        fontSize: '10px',
-                        fontWeight: 800,
-                        padding: '1px 6px',
+                        width: '14px',
+                        height: '14px',
                         borderRadius: '3px',
-                        background: isEnabled ? 'var(--bull-glow)' : 'rgba(255, 255, 255, 0.1)',
-                        color: isEnabled ? '#000' : 'var(--text-dim)',
+                        border: '1px solid',
+                        borderColor: isEnabled ? 'var(--cyan-primary)' : 'var(--border-subtle)',
+                        background: isEnabled ? 'var(--cyan-primary)' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      {isEnabled ? 'ON' : 'OFF'}
-                    </span>
-                  </div>
+                      {isEnabled && <Check size={10} style={{ color: '#0B0E14', strokeWidth: 3 }} />}
+                    </div>
+                  </button>
                 );
               })}
-            </div>
-
-            {/* Footer with link to full audio settings */}
-            <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
-                Indian Female Squawk (Heera)
-              </span>
-              <button
-                onClick={() => {
-                  setShowVoiceMenu(false);
-                  onOpenSettings();
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--gold-glow)',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <Sliders size={11} />
-                <span>Audio Tuning & Pitch</span>
-              </button>
             </div>
           </div>
         )}

@@ -16,21 +16,12 @@ import StatusBar from './components/StatusBar';
 import SmartLiquidityRadar from './components/SmartLiquidityRadar';
 import VolatilityTrapDetector from './components/VolatilityTrapDetector';
 import COTSentimentGauge from './components/COTSentimentGauge';
-import { playFlashAlert, playEventWarning, speakSquawk } from './utils/audioAlerts';
-import {
-  LayoutDashboard,
-  Sparkles,
-  Radar,
-  Newspaper,
-  Calendar,
-  AlertTriangle,
-  Target,
-  Award,
-} from 'lucide-react';
+import { speakSquawk } from './utils/audioAlerts';
+import { AlertTriangle } from 'lucide-react';
 
 export default function App() {
   const { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert, calendarAlert } = useSocket();
-  const [activeTab, setActiveTab] = useState('TERMINAL'); // 'TERMINAL' | 'COPILOT' | 'MACRO' | 'NEWS' | 'CALENDAR' | 'CALCULATOR'
+  const [activeTab, setActiveTab] = useState('TERMINAL'); // 'TERMINAL' | 'GUIDANCE' | 'MACRO' | 'NEWS' | 'LIQUIDITY' | 'COT' | 'CALENDAR'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [aiTelemetry, setAiTelemetry] = useState({});
 
@@ -47,7 +38,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Voice & Audio Squawk when high-impact breaking news arrives
+  // Voice Squawk when high-impact breaking news arrives
   useEffect(() => {
     if (latestAlert && latestAlert.impact === 'HIGH') {
       const headline = latestAlert.headline || latestAlert.title || '';
@@ -70,7 +61,7 @@ export default function App() {
     }
   }, [latestAlert?.id || latestAlert?.guid || latestAlert?.headline]);
 
-  // Audio & Voice warning for Economic Calendar Alerts
+  // Audio warning for Economic Calendar Alerts
   useEffect(() => {
     if (calendarAlert?.event) {
       const ev = calendarAlert.event;
@@ -131,130 +122,92 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const gold = prices['GC=F'] || {};
-  const currentGoldPrice = parseFloat(gold.price || 2350);
-
   return (
     <div className="app-terminal">
-      {/* Sticky Header */}
+      {/* 48px Slim Sticky Institutional Header with Integrated Workspace Tabs */}
       <Header
         connected={connected}
         latency={latency}
         aiTelemetry={aiTelemetry}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        newsCount={newsFeed.length}
       />
-
-      {/* Navigation Tabs */}
-      <nav className="nav-tabs-bar">
-        <button
-          className={`tab-btn ${activeTab === 'TERMINAL' ? 'active' : ''}`}
-          onClick={() => setActiveTab('TERMINAL')}
-        >
-          <LayoutDashboard size={15} />
-          <span>TERMINAL WORKSPACE</span>
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'GUIDANCE' ? 'active' : ''}`}
-          onClick={() => setActiveTab('GUIDANCE')}
-        >
-          <Sparkles size={15} />
-          <span>AI MARKET GUIDANCE</span>
-          <span className="tab-pill">REGIME</span>
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'MACRO' ? 'active' : ''}`}
-          onClick={() => setActiveTab('MACRO')}
-        >
-          <Radar size={15} />
-          <span>MACRO RADAR</span>
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'NEWS' ? 'active' : ''}`}
-          onClick={() => setActiveTab('NEWS')}
-        >
-          <Newspaper size={15} />
-          <span>NEWS WIRE</span>
-          <span className="tab-pill">{newsFeed.length}</span>
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'LIQUIDITY' ? 'active' : ''}`}
-          onClick={() => setActiveTab('LIQUIDITY')}
-        >
-          <Target size={15} />
-          <span>SMART LIQUIDITY</span>
-          <span className="tab-pill">SMC</span>
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'COT' ? 'active' : ''}`}
-          onClick={() => setActiveTab('COT')}
-        >
-          <Award size={15} />
-          <span>COT POSITIONING</span>
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'CALENDAR' ? 'active' : ''}`}
-          onClick={() => setActiveTab('CALENDAR')}
-        >
-          <Calendar size={15} />
-          <span>CALENDAR</span>
-        </button>
-      </nav>
 
       {/* Main Workspace Content */}
       <main className="terminal-main">
         {/* T-5 Min Red-Folder Event Warning Banner */}
         {showAlertBanner && (
-          <div className="event-alert-banner">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <AlertTriangle size={20} style={{ color: 'var(--bear-glow)' }} />
+          <div
+            style={{
+              background: 'var(--bear-bg)',
+              border: '1px solid var(--border-bear)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '8px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={16} style={{ color: 'var(--bear-primary)', flexShrink: 0 }} />
               <div>
-                <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--bear-glow)' }}>
-                  HIGH VOLATILITY WARNING &bull; T-5 MINUTES
+                <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--bear-primary)', letterSpacing: '0.05em' }}>
+                  HIGH IMPACT CATALYST &bull; T-5 MINUTES
                 </span>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
-                  [{showAlertBanner.currency}] {showAlertBanner.title} scheduled in{' '}
-                  {showAlertBanner.minutesRemaining} minutes. Expect aggressive spread widening.
+                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-main)' }}>
+                  [{showAlertBanner.currency}] {showAlertBanner.title} in{' '}
+                  {showAlertBanner.minutesRemaining} minutes. Wide spreads expected.
                 </div>
               </div>
             </div>
-            <span className="event-impact-badge high">URGENT</span>
+            <span
+              style={{
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 600,
+                padding: '2px 6px',
+                borderRadius: '3px',
+                background: 'rgba(244, 63, 94, 0.15)',
+                color: 'var(--bear-primary)',
+                border: '1px solid var(--border-bear)',
+              }}
+            >
+              DEFENSE MODE
+            </span>
           </div>
         )}
 
         {/* Tab 1: Full Institutional Terminal */}
         {activeTab === 'TERMINAL' && (
           <>
-            {/* Global Session Clock Strip */}
+            {/* Linear 24H Session Timeline Bar */}
             <SessionClock />
 
             {/* Post-News Volatility Trap Detector */}
             <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
 
-            {/* Top Grid: TradingView Chart & Confluence Bias Meter + Smart Liquidity */}
+            {/* Top 12-Column Grid: TradingView Chart + Confluence Bias & SMC */}
             <div className="grid-terminal-top">
               <TradingChart prices={prices} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
                 <SmartLiquidityRadar prices={prices} />
               </div>
             </div>
 
-            {/* Middle Section: Macro Correlation Radar */}
+            {/* Middle Section: 8-Asset Macro Correlation Ribbon */}
             <MacroRadar prices={prices} />
 
-            {/* CFTC Institutional Speculator vs Commercial Sentiment */}
+            {/* CFTC Institutional Speculator vs Commercial Sentiment Stacked Delta Bar */}
             <COTSentimentGauge cotData={cotData} />
 
-            {/* Full-Width AI Market Guidance & Volatility Risk Warnings */}
+            {/* Expandable AI Market Guidance & Volatility Intelligence Panel */}
             <AIMarketGuidance prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
 
-            {/* Bottom Grid: Real-Time Economic Calendar & Live News Wire Side-by-Side */}
+            {/* Bottom Grid: Real-Time Economic Calendar & News Wire */}
             <div className="grid-terminal-events-news">
               <EconomicCalendar calendarData={calendarData} />
               <NewsTerminal newsFeed={newsFeed} />
@@ -262,11 +215,9 @@ export default function App() {
           </>
         )}
 
-
-
         {/* Tab 2: AI Market Guidance Focus */}
         {activeTab === 'GUIDANCE' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <AIMarketGuidance prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <SmartLiquidityRadar prices={prices} />
@@ -275,7 +226,7 @@ export default function App() {
 
         {/* Tab 3: Macro Radar Focus */}
         {activeTab === 'MACRO' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <MacroRadar prices={prices} />
             <SessionClock />
             <TradingChart prices={prices} />
@@ -284,14 +235,14 @@ export default function App() {
 
         {/* Tab 4: News Wire Focus */}
         {activeTab === 'NEWS' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <NewsTerminal newsFeed={newsFeed} />
           </div>
         )}
 
         {/* Tab 5: Smart Liquidity & SMC Focus */}
         {activeTab === 'LIQUIDITY' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <SmartLiquidityRadar prices={prices} />
             <TradingChart prices={prices} />
             <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
@@ -300,7 +251,7 @@ export default function App() {
 
         {/* Tab 6: COT Positioning Focus */}
         {activeTab === 'COT' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <COTSentimentGauge cotData={cotData} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <MacroRadar prices={prices} />
@@ -309,14 +260,14 @@ export default function App() {
 
         {/* Tab 7: Economic Calendar Focus */}
         {activeTab === 'CALENDAR' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <EconomicCalendar calendarData={calendarData} />
             <SessionClock />
           </div>
         )}
       </main>
 
-      {/* Bottom Status Bar */}
+      {/* Bottom Status Bar (Bloomberg Terminal Style) */}
       <StatusBar
         connected={connected}
         prices={prices}

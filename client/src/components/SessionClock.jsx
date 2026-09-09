@@ -1,8 +1,8 @@
 // client/src/components/SessionClock.jsx
-// 24-Hour Global Market Session Clock & Volatility Regime Tracker
+// Linear 24-Hour Global Session Timeline & Volatility Regime Ribbon
 
 import { useState, useEffect } from 'react';
-import { Globe, Flame } from 'lucide-react';
+import { Globe } from 'lucide-react';
 
 export default function SessionClock() {
   const [currentUtcHour, setCurrentUtcHour] = useState(new Date().getUTCHours());
@@ -21,93 +21,93 @@ export default function SessionClock() {
 
   const sessions = [
     {
-      name: 'Tokyo / Asian',
+      id: 'asia',
+      name: 'Asian / Tokyo',
       hours: '00:00 - 09:00 UTC',
       startMins: 0,
       endMins: 9 * 60,
-      role: 'Accumulation / Range Formation',
-      volatility: 'Low - Med',
+      volatility: 'Low - Med Range',
     },
     {
+      id: 'london',
       name: 'London',
       hours: '07:00 - 16:00 UTC',
       startMins: 7 * 60,
       endMins: 16 * 60,
-      role: 'Liquidity Expansion / Trend Day',
-      volatility: 'High',
+      volatility: 'High Expansion',
     },
     {
+      id: 'overlap',
       name: 'London / NY Overlap',
       hours: '12:00 - 16:00 UTC',
       startMins: 12 * 60,
       endMins: 16 * 60,
-      role: 'PEAK GOLD VOLUME & RUNS',
-      volatility: 'Extreme Peak',
+      volatility: 'Peak Daily Volume',
       isOverlap: true,
     },
     {
+      id: 'ny',
       name: 'New York',
       hours: '12:00 - 21:00 UTC',
       startMins: 12 * 60,
       endMins: 21 * 60,
-      role: 'US Economic Releases & Fixings',
-      volatility: 'High',
+      volatility: 'High Volatility',
     },
   ];
 
-  // Determine active overlap
   const isOverlapActive = totalMins >= 12 * 60 && totalMins <= 16 * 60;
   const currentVolRegime = isOverlapActive
-    ? 'PEAK VOLATILITY (LONDON/NY OVERLAP)'
+    ? 'PEAK LIQUIDITY (OVERLAP)'
     : totalMins >= 7 * 60 && totalMins <= 21 * 60
     ? 'HIGH LIQUIDITY SESSION'
-    : 'NORMAL / ASIAN CONSOLIDATION';
+    : 'ASIAN ACCUMULATION RANGE';
 
   return (
-    <div className="panel-card">
-      <div className="panel-header">
+    <div className="session-linear-container">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
         <span className="panel-title">
-          <Globe size={15} />
-          GLOBAL SESSION CLOCK & VOLATILITY REGIME
+          <Globe size={13} />
+          24H GLOBAL SESSION TIMELINE
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Flame size={14} style={{ color: isOverlapActive ? 'var(--bear-glow)' : 'var(--gold-glow)' }} />
-          <span
-            style={{
-              fontSize: '11px',
-              fontWeight: 800,
-              color: isOverlapActive ? 'var(--bear-glow)' : 'var(--gold-glow)',
-              textTransform: 'uppercase',
-            }}
-          >
-            {currentVolRegime}
-          </span>
-        </div>
+        <span
+          style={{
+            fontSize: '10px',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 600,
+            color: isOverlapActive ? 'var(--gold-primary)' : 'var(--text-dim)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {currentVolRegime}
+        </span>
       </div>
 
-      <div className="session-clock-strip">
+      <div className="session-timeline-strip">
         {sessions.map((s) => {
           const isOpen = totalMins >= s.startMins && totalMins <= s.endMins;
           return (
             <div
-              key={s.name}
-              className={`session-box ${isOpen ? 'active' : ''}`}
+              key={s.id}
+              className={`session-segment ${isOpen ? 'active' : ''}`}
               style={{
-                borderColor: s.isOverlap && isOpen ? 'var(--gold-primary)' : undefined,
-                background: s.isOverlap && isOpen ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.18), var(--bg-panel))' : undefined,
+                borderColor: s.isOverlap && isOpen ? 'rgba(245, 158, 11, 0.3)' : undefined,
               }}
             >
-              <div className="session-name">
-                <span style={{ color: s.isOverlap ? 'var(--gold-glow)' : '#fff' }}>{s.name}</span>
-                <span className={`session-status ${isOpen ? 'open' : 'closed'}`}>
-                  {isOpen ? 'OPEN' : 'CLOSED'}
+              <div className="session-segment-header">
+                <span className="session-segment-name">
+                  {isOpen && <span className="session-dot-pulse" style={{ background: s.isOverlap ? 'var(--gold-primary)' : 'var(--bull-primary)' }} />}
+                  <span>{s.name}</span>
                 </span>
+                <span className="session-segment-hours">{s.hours}</span>
               </div>
-              <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
-                {s.hours}
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                Vol: <strong style={{ color: isOpen ? 'var(--bull-glow)' : 'inherit' }}>{s.volatility}</strong>
+              <div className="session-segment-vol">
+                {isOpen ? (
+                  <span style={{ color: s.isOverlap ? 'var(--gold-primary)' : 'var(--bull-primary)' }}>
+                    ACTIVE &bull; {s.volatility}
+                  </span>
+                ) : (
+                  <span>CLOSED &bull; {s.volatility}</span>
+                )}
               </div>
             </div>
           );

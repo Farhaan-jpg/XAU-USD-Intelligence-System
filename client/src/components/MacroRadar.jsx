@@ -1,6 +1,9 @@
+// client/src/components/MacroRadar.jsx
+// Institutional 8-Asset Intermarket Correlation Matrix Ribbon with Divergence Engine
+
 import { useMemo, useEffect } from 'react';
-import { Radar, ArrowUpRight, ArrowDownRight, AlertTriangle, Activity } from 'lucide-react';
-import { playDivergenceAlert, speakSquawk } from '../utils/audioAlerts';
+import { Radar, ArrowUpRight, ArrowDownRight, AlertTriangle } from 'lucide-react';
+import { speakSquawk } from '../utils/audioAlerts';
 
 export default function MacroRadar({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
@@ -15,7 +18,7 @@ export default function MacroRadar({ prices = {} }) {
   const silverPrice = parseFloat(silver.price || 0);
   const gsr = goldPrice > 0 && silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '66.0';
 
-  // Divergence Engine with Sound & Voice Squawk
+  // Divergence Engine with Audio Trigger
   const divergence = useMemo(() => {
     const goldChg5m = parseFloat(gold.change5m || 0);
     const dxyChg5m = parseFloat(dxy.change5m || 0);
@@ -32,9 +35,9 @@ export default function MacroRadar({ prices = {} }) {
       return {
         type: 'BULLISH_DIVERGENCE',
         title: 'Institutional Bullish Divergence',
-        desc: 'US Dollar (DXY) and 10Y Yields are both dropping while Gold is lagging. High probability coiled upside breakout.',
+        desc: 'US Dollar (DXY) and 10Y Yields are dropping while Gold lags. High probability upside expansion.',
         badge: 'BULLISH SETUP',
-        color: 'var(--bull-glow)',
+        color: 'var(--bull-primary)',
       };
     }
 
@@ -42,10 +45,10 @@ export default function MacroRadar({ prices = {} }) {
     if (dxyImpulse > 0.03 && us10yImpulse > 0.02 && goldChg5m >= -0.01) {
       return {
         type: 'BEARISH_DIVERGENCE',
-        title: 'Yield / Dollar Warning',
-        desc: 'US Dollar and Treasury Yields are pushing higher while Gold is holding flat. Downside liquidity sweep risk elevated.',
+        title: 'Yield / Dollar Drag Warning',
+        desc: 'US Dollar and Treasury Yields advancing higher while Gold holds flat. Downside sweep risk elevated.',
         badge: 'BEARISH RISK',
-        color: 'var(--bear-glow)',
+        color: 'var(--bear-primary)',
       };
     }
 
@@ -54,16 +57,15 @@ export default function MacroRadar({ prices = {} }) {
       return {
         type: 'SILVER_LEAD',
         title: 'Silver High-Beta Lead Signal',
-        desc: 'Silver (XAG/USD) is expanding aggressively ahead of Gold. Institutional rotation signals impending Gold catch-up run.',
+        desc: 'Silver (XAG/USD) is expanding ahead of Gold. Institutional rotation signals impending catch-up run.',
         badge: 'ROTATION SIGNAL',
-        color: 'var(--cyan-glow)',
+        color: 'var(--cyan-primary)',
       };
     }
 
     return null;
   }, [gold, silver, dxy, us10y]);
 
-  // Audio trigger on new divergence
   useEffect(() => {
     if (divergence) {
       const isBearish = divergence.type === 'BEARISH_DIVERGENCE';
@@ -75,71 +77,71 @@ export default function MacroRadar({ prices = {} }) {
     }
   }, [divergence?.type]);
 
-  const cards = [
+  const assets = [
     {
       symbol: 'GC=F',
       name: 'XAU/USD',
       label: 'Gold Spot',
       price: goldPrice > 0 ? `$${goldPrice.toFixed(2)}` : '--',
-      chg: gold.change5m || 0,
-      primary: true,
-      unit: 'USD/oz',
+      chg: gold.change5m || gold.changeDay || 0,
+      corr: 'Benchmark',
+      isPrimary: true,
     },
     {
       symbol: 'SI=F',
       name: 'XAG/USD',
-      label: 'Silver Spot',
+      label: 'Silver',
       price: silverPrice > 0 ? `$${silverPrice.toFixed(2)}` : '--',
-      chg: silver.change5m || 0,
-      unit: 'USD/oz',
-    },
-    {
-      symbol: 'GSR',
-      name: 'GSR',
-      label: 'Gold-Silver Ratio',
-      price: gsr,
-      chg: 0,
-      unit: 'ratio',
+      chg: silver.change5m || silver.changeDay || 0,
+      corr: '+0.88 Corr',
     },
     {
       symbol: 'DX-Y.NYB',
       name: 'DXY',
-      label: 'US Dollar Index',
+      label: 'US Dollar',
       price: dxy.price ? parseFloat(dxy.price).toFixed(2) : '104.80',
-      chg: dxy.change5m || 0,
-      unit: 'pts',
+      chg: dxy.change5m || dxy.changeDay || 0,
+      corr: '-0.84 Corr',
     },
     {
       symbol: '^TNX',
       name: 'US10Y',
-      label: '10Y Treasury Yield',
+      label: '10Y Yield',
       price: us10y.price ? `${parseFloat(us10y.price).toFixed(3)}%` : '4.280%',
-      chg: us10y.change5m || 0,
-      unit: '%',
+      chg: us10y.change5m || us10y.changeDay || 0,
+      corr: '-0.68 Corr',
     },
     {
       symbol: '^IRX',
       name: 'US02Y',
-      label: '2Y Treasury Yield',
+      label: '2Y Yield',
       price: us02y.price ? `${parseFloat(us02y.price).toFixed(3)}%` : '4.650%',
-      chg: us02y.change5m || 0,
-      unit: '%',
+      chg: us02y.change5m || us02y.changeDay || 0,
+      corr: '-0.62 Corr',
     },
     {
       symbol: 'JPY=X',
       name: 'USD/JPY',
       label: 'Dollar Yen',
       price: usdjpy.price ? parseFloat(usdjpy.price).toFixed(2) : '156.20',
-      chg: usdjpy.change5m || 0,
-      unit: 'pts',
+      chg: usdjpy.change5m || usdjpy.changeDay || 0,
+      corr: '-0.54 Corr',
     },
     {
       symbol: 'CL=F',
-      name: 'CRUDE OIL',
-      label: 'WTI Crude',
+      name: 'WTI CRUDE',
+      label: 'Crude Oil',
       price: oil.price ? `$${parseFloat(oil.price).toFixed(2)}` : '$78.50',
-      chg: oil.change5m || 0,
-      unit: 'USD/bbl',
+      chg: oil.change5m || oil.changeDay || 0,
+      corr: '+0.46 Corr',
+    },
+    {
+      symbol: 'GSR',
+      name: 'GSR',
+      label: 'Gold/Silver',
+      price: gsr,
+      chg: 0,
+      corr: 'Ratio',
     },
   ];
 
@@ -147,66 +149,76 @@ export default function MacroRadar({ prices = {} }) {
     <div className="panel-card">
       <div className="panel-header">
         <span className="panel-title">
-          <Radar size={15} />
-          MACRO CORRELATION RADAR
+          <Radar size={13} />
+          8-ASSET INTERMARKET CORRELATION RIBBON
         </span>
-        <span className="telemetry-badge" style={{ fontSize: '10px' }}>
-          8 INTERMARKET ASSETS
+        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+          CROSS-ASSET RADAR
         </span>
       </div>
 
-      {/* Divergence Notification Alert Box */}
+      {/* Divergence Notification Callout */}
       {divergence && (
-        <div className="divergence-alert-box" style={{ borderColor: divergence.color }}>
-          <AlertTriangle size={18} style={{ color: divergence.color, flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>{divergence.title}</span>
-              <span
-                style={{
-                  fontSize: '9px',
-                  fontWeight: 800,
-                  padding: '1px 6px',
-                  borderRadius: '10px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: divergence.color,
-                }}
-              >
-                {divergence.badge}
-              </span>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              {divergence.desc}
-            </div>
+        <div
+          style={{
+            background: 'rgba(0,0,0,0.25)',
+            borderLeft: `3px solid ${divergence.color}`,
+            borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '11px',
+          }}
+        >
+          <AlertTriangle size={15} style={{ color: divergence.color, flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <strong style={{ color: 'var(--text-main)' }}>{divergence.title}:</strong>
+            <span style={{ color: 'var(--text-muted)' }}>{divergence.desc}</span>
+            <span
+              style={{
+                fontSize: '9px',
+                fontWeight: 600,
+                padding: '1px 5px',
+                borderRadius: '3px',
+                background: 'rgba(255,255,255,0.06)',
+                color: divergence.color,
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {divergence.badge}
+            </span>
           </div>
         </div>
       )}
 
-      {/* Macro Asset Cards Grid */}
-      <div className="macro-radar-grid">
-        {cards.map((c) => {
-          const chgNum = parseFloat(c.chg || 0);
+      {/* 8-Column High-Density Ticker Grid */}
+      <div className="macro-ribbon-grid">
+        {assets.map((a) => {
+          const chgNum = parseFloat(a.chg || 0);
           const isUp = chgNum > 0;
           return (
             <div
-              key={c.symbol}
-              className={`macro-card ${c.primary ? 'primary-gold' : ''}`}
+              key={a.symbol}
+              className="macro-ribbon-item"
+              style={{
+                borderColor: a.isPrimary ? 'rgba(234, 179, 8, 0.25)' : undefined,
+                background: a.isPrimary ? 'rgba(234, 179, 8, 0.04)' : undefined,
+              }}
             >
-              <div className="macro-card-header">
-                <span style={{ fontWeight: 700, color: c.primary ? 'var(--gold-glow)' : 'inherit' }}>
-                  {c.name}
-                </span>
-                <span>{c.label}</span>
+              <div className="macro-ribbon-name">
+                <span>{a.name}</span>
+                <span style={{ fontSize: '9px', opacity: 0.6 }}>{a.corr}</span>
               </div>
 
-              <div className="macro-card-price">{c.price}</div>
+              <div className="macro-ribbon-price">{a.price}</div>
 
-              <div className={`macro-card-velocity ${isUp ? 'up' : 'down'}`}>
-                {isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                <span>
-                  {chgNum > 0 ? '+' : ''}
-                  {chgNum.toFixed(2)}%
-                </span>
+              <div
+                className="macro-ribbon-chg"
+                style={{ color: chgNum === 0 ? 'var(--text-dim)' : isUp ? 'var(--bull-primary)' : 'var(--bear-primary)' }}
+              >
+                {chgNum !== 0 && (isUp ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />)}
+                <span>{chgNum > 0 ? '+' : ''}{chgNum.toFixed(2)}%</span>
               </div>
             </div>
           );

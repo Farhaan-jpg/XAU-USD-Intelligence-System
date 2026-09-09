@@ -1,12 +1,10 @@
 // client/src/components/COTSentimentGauge.jsx
-// Institutional CFTC Commitment of Traders (COT) Speculator vs Hedger Positioning
-// Real-Time Retail Crowd Sentiment & Liquidity Positioning
+// Institutional CFTC Commitment of Traders (COT) with Unified Stacked Delta Bar & Retail Positioning
 
 import { useMemo } from 'react';
-import { Award, ShieldAlert, Users, TrendingUp } from 'lucide-react';
+import { Award } from 'lucide-react';
 
 export default function COTSentimentGauge({ cotData: externalCotData }) {
-  // Institutional Speculators (Hedge Funds / Asset Managers) vs Commercial Hedgers (Producers / Bullion Banks)
   const cotData = useMemo(() => {
     if (externalCotData) {
       const mm = externalCotData.managedMoney || {};
@@ -20,12 +18,10 @@ export default function COTSentimentGauge({ cotData: externalCotData }) {
         commercialNetShort: comm.netShort !== undefined ? comm.netShort : -248100,
         commercialHedgePct: comm.hedgePct !== undefined ? comm.hedgePct : 81.2,
         commercialStatus: comm.status || 'Aggressive Hedging',
-        commercialRole: comm.liquidityRole || 'Providing Sell Liquidity',
         retailSentiment: {
           longPct: ret.longPct !== undefined ? ret.longPct : 62,
           shortPct: ret.shortPct !== undefined ? ret.shortPct : 38,
-          bias: ret.bias || 'Crowd is Net Long',
-          contrarianSignal: ret.contrarianSignal || 'Contrarian Watch: Elevated',
+          bias: ret.bias || 'Crowd Net Long',
           contrarianLevel: ret.contrarianLevel || 'ELEVATED',
         },
       };
@@ -38,103 +34,88 @@ export default function COTSentimentGauge({ cotData: externalCotData }) {
       commercialNetShort: -248100,
       commercialHedgePct: 81.2,
       commercialStatus: 'Aggressive Hedging',
-      commercialRole: 'Providing Sell Liquidity',
       retailSentiment: {
         longPct: 62,
         shortPct: 38,
-        bias: 'Crowd is Net Long',
-        contrarianSignal: 'Contrarian Watch: Elevated',
+        bias: 'Crowd Net Long',
         contrarianLevel: 'ELEVATED',
       },
     };
   }, [externalCotData]);
 
+  const totalContracts = Math.abs(cotData.netSpeculatorLong) + Math.abs(cotData.commercialNetShort);
+  const specPct = Math.round((Math.abs(cotData.netSpeculatorLong) / totalContracts) * 100);
+  const commPct = 100 - specPct;
+
   return (
     <div className="panel-card">
       <div className="panel-header">
         <span className="panel-title">
-          <Award size={15} />
-          CFTC COMMITMENT OF TRADERS (COT) & INSTITUTIONAL POSITIONING
+          <Award size={13} />
+          CFTC COMMITMENT OF TRADERS (COT) POSITIONING
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="live-tick-pulse" title="Real-Time Retail Sentiment Stream Active">
-            <span className="live-tick-dot"></span>
-            <span>REAL-TIME FLOW</span>
-          </span>
-          <span className="telemetry-badge" style={{ fontSize: '10px' }}>
-            {cotData.reportDate}
-          </span>
-        </div>
+        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+          {cotData.reportDate}
+        </span>
       </div>
 
-      <div className="cot-grid">
-        {/* Speculator Net Positioning */}
-        <div className="cot-box">
-          <span className="cot-label">MANAGED MONEY / HEDGE FUNDS</span>
-          <div className="cot-value" style={{ color: 'var(--bull-glow)' }}>
-            +{cotData.netSpeculatorLong.toLocaleString('en-US')} contracts
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '14px', alignItems: 'center' }}>
+        {/* Left: Unified Institutional Stacked Delta Bar */}
+        <div className="cot-stacked-container">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div>
+              <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                MANAGED MONEY (FUNDS)
+              </span>
+              <div style={{ fontSize: '15px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--bull-primary)' }}>
+                +{cotData.netSpeculatorLong.toLocaleString('en-US')}
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', marginLeft: '4px' }}>contracts</span>
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                COMMERCIAL HEDGERS (BANKS)
+              </span>
+              <div style={{ fontSize: '15px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--bear-primary)' }}>
+                {cotData.commercialNetShort.toLocaleString('en-US')}
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', marginLeft: '4px' }}>contracts</span>
+              </div>
+            </div>
           </div>
-          <div className="cot-bar-container">
-            <div
-              className="cot-bar-fill"
-              style={{ width: `${cotData.speculatorBiasPct}%`, background: 'var(--bull-glow)' }}
-            />
+
+          {/* Unified Stacked Delta Bar */}
+          <div className="cot-stacked-bar-wrap">
+            <div className="cot-stacked-fill-long" style={{ width: `${specPct}%` }} />
+            <div className="cot-stacked-fill-short" style={{ width: `${commPct}%` }} />
           </div>
-          <div className="cot-sub">
-            <span>{cotData.speculatorBiasPct}% Bullish Net Longs</span>
-            <span>Historical {cotData.percentile}th Percentile</span>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
+            <span>{cotData.speculatorBiasPct}% Bullish Longs ({cotData.percentile}th Pctile)</span>
+            <span>{cotData.commercialStatus} ({cotData.commercialHedgePct}% Hedged)</span>
           </div>
         </div>
 
-        {/* Commercial Hedgers (Bullion Banks) */}
-        <div className="cot-box">
-          <span className="cot-label">COMMERCIAL HEDGERS (BULLION BANKS)</span>
-          <div className="cot-value" style={{ color: 'var(--bear-glow)' }}>
-            {cotData.commercialNetShort.toLocaleString('en-US')} contracts
-          </div>
-          <div className="cot-bar-container">
-            <div
-              className="cot-bar-fill"
-              style={{ width: `${cotData.commercialHedgePct}%`, background: 'var(--bear-glow)' }}
-            />
-          </div>
-          <div className="cot-sub">
-            <span>{cotData.commercialStatus}</span>
-            <span>{cotData.commercialRole}</span>
-          </div>
-        </div>
-
-        {/* Retail Sentiment Breakdown */}
-        <div className="cot-box">
-          <span className="cot-label">RETAIL BROKER CROWD SENTIMENT</span>
-          <div className="cot-value" style={{ color: 'var(--gold-glow)' }}>
-            {cotData.retailSentiment.longPct}% Long / {cotData.retailSentiment.shortPct}% Short
-          </div>
-          <div className="cot-bar-container" style={{ display: 'flex' }}>
-            <div
-              style={{
-                width: `${cotData.retailSentiment.longPct}%`,
-                background: 'var(--bull-glow)',
-                height: '100%',
-                borderRadius: '4px 0 0 4px',
-                transition: 'width 0.4s ease',
-              }}
-            />
-            <div
-              style={{
-                width: `${cotData.retailSentiment.shortPct}%`,
-                background: 'var(--bear-glow)',
-                height: '100%',
-                borderRadius: '0 4px 4px 0',
-                transition: 'width 0.4s ease',
-              }}
-            />
-          </div>
-          <div className="cot-sub">
-            <span>{cotData.retailSentiment.bias}</span>
-            <span style={{ color: cotData.retailSentiment.contrarianLevel === 'EXTREME' ? 'var(--bear-glow)' : 'inherit' }}>
-              {cotData.retailSentiment.contrarianSignal}
+        {/* Right: Retail Crowd Contrarian Indicator */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+              RETAIL SENTIMENT
             </span>
+            <span style={{ fontSize: '9px', fontWeight: 600, color: cotData.retailSentiment.contrarianLevel === 'EXTREME' ? 'var(--bear-primary)' : 'var(--gold-primary)', fontFamily: 'var(--font-mono)' }}>
+              CONTRARIAN: {cotData.retailSentiment.contrarianLevel}
+            </span>
+          </div>
+
+          <div style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-main)', marginBottom: '4px' }}>
+            <span style={{ color: 'var(--bull-primary)' }}>{cotData.retailSentiment.longPct}% Long</span>
+            <span style={{ margin: '0 4px', color: 'var(--text-dim)' }}>/</span>
+            <span style={{ color: 'var(--bear-primary)' }}>{cotData.retailSentiment.shortPct}% Short</span>
+          </div>
+
+          <div style={{ display: 'flex', height: '4px', borderRadius: '2px', overflow: 'hidden', background: '#1E293B' }}>
+            <div style={{ width: `${cotData.retailSentiment.longPct}%`, background: 'var(--bull-primary)' }} />
+            <div style={{ width: `${cotData.retailSentiment.shortPct}%`, background: 'var(--bear-primary)' }} />
           </div>
         </div>
       </div>

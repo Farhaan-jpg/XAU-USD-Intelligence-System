@@ -1,16 +1,15 @@
 // client/src/components/SmartLiquidityRadar.jsx
-// Institutional Smart Money Concepts (SMC) & Liquidity Level Radar
-// Detects Buy-Side Liquidity (BSL), Sell-Side Liquidity (SSL), Fair Value Gaps (FVG), and Order Blocks
+// Institutional Smart Money Concepts (SMC) & Liquidity Radar (BSL / SSL / FVG / OB)
 
 import { useMemo, useEffect, useRef } from 'react';
-import { Target, Layers, ArrowUpRight, ArrowDownRight, ShieldCheck, Zap } from 'lucide-react';
+import { Target } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
 export default function SmartLiquidityRadar({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
 
-  // Compute ICT Institutional SMC Levels dynamically based on live spot and session range
+  // Compute ICT Institutional SMC Levels dynamically
   const smcLevels = useMemo(() => {
     const p = spotPrice || 4400;
     const high = parseFloat(gold.high || 0);
@@ -35,7 +34,6 @@ export default function SmartLiquidityRadar({ prices = {} }) {
       };
     }
 
-    // Volatility-calibrated fallback if session range is pending
     return {
       bslMajor: (p + 16.80).toFixed(2),
       bslMinor: (p + 8.40).toFixed(2),
@@ -89,89 +87,80 @@ export default function SmartLiquidityRadar({ prices = {} }) {
     <div className="panel-card">
       <div className="panel-header">
         <span className="panel-title">
-          <Target size={15} />
-          SMART LIQUIDITY & ORDER BLOCK RADAR (ICT / SMC)
+          <Target size={13} />
+          SMART MONEY CONCEPTS & LIQUIDITY MAP
         </span>
-        <span className="telemetry-badge" style={{ fontSize: '10px', color: 'var(--gold-glow)' }}>
-          LIQUIDITY ENGINE ACTIVE
+        <span
+          style={{
+            fontSize: '10px',
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text-dim)',
+          }}
+        >
+          EQ: ${smcLevels.equilibrium}
         </span>
       </div>
 
-      <div className="liquidity-grid">
-        {/* Buy-Side Liquidity Pool (BSL) */}
-        <div className="liquidity-card bsl">
-          <div className="liquidity-card-header">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--bear-glow)' }}>
-              <ArrowUpRight size={14} />
-              <strong>BUY-SIDE LIQUIDITY (BSL)</strong>
-            </span>
-            <span className="event-impact-badge high">RESTING BUY STOPS</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+        {/* Column 1: Buy-Side Liquidity (BSL) */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--bear-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+            BUY-SIDE LIQUIDITY (BSL)
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Major Pool (Equal Highs)</span>
-              <span className="liquidity-val" style={{ color: 'var(--bear-glow)' }}>${smcLevels.bslMajor}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Major Highs</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bear-primary)' }}>${smcLevels.bslMajor}</span>
             </div>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Minor Asian High Sweep</span>
-              <span className="liquidity-val" style={{ color: 'var(--bear-glow)' }}>${smcLevels.bslMinor}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Minor Sweep</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bear-primary)' }}>${smcLevels.bslMinor}</span>
             </div>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Bearish Order Block (OB)</span>
-              <span className="liquidity-val" style={{ color: '#fff' }}>${smcLevels.bearishOB}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Bearish OB</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)', fontSize: '10px' }}>${smcLevels.bearishOB}</span>
             </div>
           </div>
         </div>
 
-        {/* Sell-Side Liquidity Pool (SSL) */}
-        <div className="liquidity-card ssl">
-          <div className="liquidity-card-header">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--bull-glow)' }}>
-              <ArrowDownRight size={14} />
-              <strong>SELL-SIDE LIQUIDITY (SSL)</strong>
-            </span>
-            <span className="event-impact-badge low">RESTING SELL STOPS</span>
+        {/* Column 2: Sell-Side Liquidity (SSL) */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--bull-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+            SELL-SIDE LIQUIDITY (SSL)
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Minor Asian Low Sweep</span>
-              <span className="liquidity-val" style={{ color: 'var(--bull-glow)' }}>${smcLevels.sslMinor}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Major Lows</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bull-primary)' }}>${smcLevels.sslMajor}</span>
             </div>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Major Pool (Equal Lows)</span>
-              <span className="liquidity-val" style={{ color: 'var(--bull-glow)' }}>${smcLevels.sslMajor}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Minor Sweep</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bull-primary)' }}>${smcLevels.sslMinor}</span>
             </div>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Bullish Order Block (OB)</span>
-              <span className="liquidity-val" style={{ color: '#fff' }}>${smcLevels.bullishOB}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Bullish OB</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)', fontSize: '10px' }}>${smcLevels.bullishOB}</span>
             </div>
           </div>
         </div>
 
-        {/* Fair Value Gaps (FVG) Imbalance Tracker */}
-        <div className="liquidity-card fvg">
-          <div className="liquidity-card-header">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--gold-glow)' }}>
-              <Zap size={14} />
-              <strong>FAIR VALUE GAPS (FVG)</strong>
-            </span>
-            <span className="event-impact-badge med">IMBALANCES</span>
+        {/* Column 3: Imbalance & Gaps (FVG) */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--gold-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+            FAIR VALUE GAPS (FVG)
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Premium Imbalance</span>
-              <span className="liquidity-val" style={{ color: 'var(--bear-glow)' }}>${smcLevels.fvgPremium}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Premium</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bear-primary)', fontSize: '10px' }}>${smcLevels.fvgPremium}</span>
             </div>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Discount Imbalance</span>
-              <span className="liquidity-val" style={{ color: 'var(--bull-glow)' }}>${smcLevels.fvgDiscount}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Discount</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--bull-primary)', fontSize: '10px' }}>${smcLevels.fvgDiscount}</span>
             </div>
-            <div className="liquidity-row">
-              <span className="liquidity-label">Equilibrium (EQ 50%)</span>
-              <span className="liquidity-val" style={{ color: 'var(--gold-glow)' }}>${smcLevels.equilibrium}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Equilibrium</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gold-primary)' }}>${smcLevels.equilibrium}</span>
             </div>
           </div>
         </div>

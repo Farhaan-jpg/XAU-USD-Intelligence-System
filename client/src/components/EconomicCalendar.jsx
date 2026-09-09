@@ -1,14 +1,14 @@
 // client/src/components/EconomicCalendar.jsx
-// Institutional Forex Factory Economic Calendar with Real-Time Countdown Engine
+// Tabular Institutional Economic Calendar with Impact Dots & Live Countdown Engine
 
 import { useState, useEffect, useMemo } from 'react';
-import { Calendar as CalendarIcon, Clock, AlertTriangle, Zap, Timer } from 'lucide-react';
+import { Calendar as CalendarIcon, Timer } from 'lucide-react';
 
 export default function EconomicCalendar({ calendarData = {} }) {
   const [filterMode, setFilterMode] = useState('ALL'); // 'ALL' | 'HIGH' | 'USD'
   const [now, setNow] = useState(Date.now());
 
-  // 1-Second real-time ticking clock for exact live countdowns
+  // 1-Second real-time ticking clock
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
@@ -17,8 +17,7 @@ export default function EconomicCalendar({ calendarData = {} }) {
   }, []);
 
   const allEvents = useMemo(() => {
-    const raw = calendarData?.events || calendarData?.upcomingEvents || [];
-    return raw;
+    return calendarData?.events || calendarData?.upcomingEvents || [];
   }, [calendarData]);
 
   const filteredEvents = useMemo(() => {
@@ -29,7 +28,6 @@ export default function EconomicCalendar({ calendarData = {} }) {
     });
   }, [allEvents, filterMode]);
 
-  // Find next upcoming high impact event
   const nextCatalyst = useMemo(() => {
     const futureEvents = allEvents.filter((e) => {
       const t = new Date(e.date || e.timeUTC).getTime();
@@ -38,7 +36,6 @@ export default function EconomicCalendar({ calendarData = {} }) {
     return futureEvents.find((e) => e.impact === 'HIGH') || futureEvents[0] || calendarData?.nextEvent || null;
   }, [allEvents, now, calendarData]);
 
-  // Calculate live countdown string for the next catalyst
   const catalystCountdown = useMemo(() => {
     if (!nextCatalyst) return null;
     const target = new Date(nextCatalyst.date || nextCatalyst.timeUTC).getTime();
@@ -49,7 +46,6 @@ export default function EconomicCalendar({ calendarData = {} }) {
     const s = totalSec % 60;
     return {
       formatted: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`,
-      minsLeft: Math.round(diff / 60000),
       isUrgent: diff <= 30 * 60 * 1000 && diff > 0,
     };
   }, [nextCatalyst, now]);
@@ -58,8 +54,8 @@ export default function EconomicCalendar({ calendarData = {} }) {
     <div className="panel-card panel-card-flex" style={{ height: '100%' }}>
       <div className="panel-header">
         <span className="panel-title">
-          <CalendarIcon size={15} />
-          ECONOMIC EVENT CALENDAR & VOLATILITY WINDOWS
+          <CalendarIcon size={13} />
+          ECONOMIC EVENT CALENDAR
         </span>
 
         <div className="filter-pills-row">
@@ -67,7 +63,7 @@ export default function EconomicCalendar({ calendarData = {} }) {
             className={`filter-pill ${filterMode === 'ALL' ? 'active' : ''}`}
             onClick={() => setFilterMode('ALL')}
           >
-            ALL EVENTS ({allEvents.length})
+            ALL ({allEvents.length})
           </button>
           <button
             className={`filter-pill ${filterMode === 'HIGH' ? 'active' : ''}`}
@@ -84,60 +80,43 @@ export default function EconomicCalendar({ calendarData = {} }) {
         </div>
       </div>
 
-      {/* Next Major Catalyst Real-Time Countdown Hero Banner */}
+      {/* Next Major Catalyst Countdown Bar */}
       {nextCatalyst && (
         <div
-          className={`event-catalyst-hero ${catalystCountdown?.isUrgent ? 'urgent' : ''}`}
           style={{
-            background: catalystCountdown?.isUrgent
-              ? 'linear-gradient(90deg, rgba(239, 68, 68, 0.16), rgba(245, 158, 11, 0.16))'
-              : 'linear-gradient(90deg, rgba(245, 158, 11, 0.1), rgba(15, 23, 38, 0.8))',
-            border: catalystCountdown?.isUrgent ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid var(--border-gold)',
+            background: catalystCountdown?.isUrgent ? 'var(--bear-bg)' : 'rgba(0,0,0,0.2)',
+            border: catalystCountdown?.isUrgent ? '1px solid var(--border-bear)' : '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius-sm)',
-            padding: '12px 16px',
+            padding: '8px 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '14px',
+            gap: '10px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: 'var(--radius-sm)',
-                background: catalystCountdown?.isUrgent ? 'var(--bear-bg)' : 'var(--gold-bg)',
-                border: catalystCountdown?.isUrgent ? '1px solid var(--border-bear)' : '1px solid var(--border-gold)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: catalystCountdown?.isUrgent ? 'var(--bear-glow)' : 'var(--gold-glow)',
-              }}
-            >
-              <Timer size={18} />
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Timer size={15} style={{ color: catalystCountdown?.isUrgent ? 'var(--bear-primary)' : 'var(--gold-primary)' }} />
             <div>
-              <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700 }}>
-                NEXT MAJOR GOLD CATALYST &bull; {nextCatalyst.currency} {nextCatalyst.impact} IMPACT
+              <div style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.05em' }}>
+                NEXT CATALYST &bull; {nextCatalyst.currency}
               </div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>
-                [{nextCatalyst.currency}] {nextCatalyst.title}
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>
+                {nextCatalyst.title}
               </div>
             </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700 }}>
-              COUNTDOWN TO RELEASE
+            <div style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 600 }}>
+              COUNTDOWN
             </div>
             <div
               style={{
-                fontSize: '18px',
-                fontWeight: 800,
-                color: catalystCountdown?.isUrgent ? 'var(--bear-glow)' : 'var(--gold-glow)',
+                fontSize: '15px',
+                fontWeight: 600,
+                color: catalystCountdown?.isUrgent ? 'var(--bear-primary)' : 'var(--gold-primary)',
                 fontFamily: 'var(--font-mono)',
-                letterSpacing: '1px',
+                fontVariantNumeric: 'tabular-nums',
               }}
             >
               {catalystCountdown?.formatted || '00:00:00'}
@@ -146,29 +125,29 @@ export default function EconomicCalendar({ calendarData = {} }) {
         </div>
       )}
 
-      {/* Events Table (Responsive scroll wrapper) */}
-      <div style={{ maxHeight: '380px', overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table className="calendar-events-table" style={{ minWidth: '540px' }}>
+      {/* Tabular Events View */}
+      <div style={{ maxHeight: '380px', overflowY: 'auto', overflowX: 'auto' }}>
+        <table className="calendar-events-table">
           <thead>
             <tr>
-              <th style={{ width: '85px' }}>TIME (UTC)</th>
-              <th style={{ width: '105px' }}>COUNTDOWN</th>
-              <th style={{ width: '55px' }}>CURR</th>
+              <th style={{ width: '70px' }}>TIME (UTC)</th>
+              <th style={{ width: '85px' }}>COUNTDOWN</th>
+              <th style={{ width: '45px' }}>CURR</th>
               <th>EVENT</th>
-              <th style={{ width: '80px' }}>IMPACT</th>
-              <th style={{ width: '70px', textAlign: 'right' }}>FORECAST</th>
-              <th style={{ width: '70px', textAlign: 'right' }}>PREV</th>
+              <th style={{ width: '60px' }}>IMPACT</th>
+              <th style={{ width: '65px', textAlign: 'right' }}>FORECAST</th>
+              <th style={{ width: '65px', textAlign: 'right' }}>PREV</th>
             </tr>
           </thead>
           <tbody>
             {filteredEvents.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '28px' }}>
-                  No events found matching the selected filter.
+                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '24px' }}>
+                  No economic events found matching filter.
                 </td>
               </tr>
             ) : (
-              filteredEvents.slice(0, 25).map((e, idx) => {
+              filteredEvents.slice(0, 30).map((e, idx) => {
                 const isHigh = e.impact === 'HIGH';
                 const isMed = e.impact === 'MED';
                 const eventTimeMs = new Date(e.date || e.timeUTC).getTime();
@@ -184,11 +163,11 @@ export default function EconomicCalendar({ calendarData = {} }) {
                   const s = sec % 60;
                   if (h > 24) {
                     const days = Math.floor(h / 24);
-                    countdownLabel = `in ${days}d ${h % 24}h`;
+                    countdownLabel = `${days}d ${h % 24}h`;
                   } else {
-                    countdownLabel = `in ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                    countdownLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
                   }
-                  countdownColor = isHigh ? 'var(--gold-glow)' : 'var(--text-muted)';
+                  countdownColor = isHigh ? 'var(--gold-primary)' : 'var(--text-muted)';
                 }
 
                 const utcTimeStr = e.date || e.timeUTC
@@ -197,32 +176,32 @@ export default function EconomicCalendar({ calendarData = {} }) {
 
                 return (
                   <tr key={e.id || idx}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#fff' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
                       {utcTimeStr}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: countdownColor, fontWeight: 600 }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: countdownColor }}>
                       {countdownLabel}
                     </td>
                     <td>
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          color: e.currency === 'USD' ? 'var(--gold-glow)' : 'var(--text-main)',
-                        }}
-                      >
+                      <span style={{ fontWeight: 600, color: e.currency === 'USD' ? 'var(--brand-gold)' : 'var(--text-secondary)' }}>
                         {e.currency || 'USD'}
                       </span>
                     </td>
-                    <td style={{ fontWeight: 600, color: '#e5e7eb' }}>{e.title}</td>
-                    <td>
-                      <span className={`event-impact-badge ${isHigh ? 'high' : isMed ? 'med' : 'low'}`}>
-                        {e.impact}
-                      </span>
+                    <td style={{ color: 'var(--text-main)', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {e.title}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textAlign: 'right' }}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span className={`impact-dot ${isHigh ? 'high' : isMed ? 'med' : 'low'}`} />
+                        <span style={{ fontSize: '10px', color: isHigh ? 'var(--bear-primary)' : isMed ? 'var(--gold-primary)' : 'var(--text-dim)' }}>
+                          {e.impact}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', textAlign: 'right', color: 'var(--text-muted)' }}>
                       {e.forecast || '--'}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', textAlign: 'right' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', textAlign: 'right', color: 'var(--text-dim)' }}>
                       {e.previous || '--'}
                     </td>
                   </tr>
@@ -233,21 +212,20 @@ export default function EconomicCalendar({ calendarData = {} }) {
         </table>
       </div>
 
-      {/* Calendar Footer Strip matching NewsTerminal */}
       <div
         style={{
           borderTop: '1px solid var(--border-subtle)',
-          paddingTop: '8px',
+          paddingTop: '6px',
           marginTop: 'auto',
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '11px',
+          fontSize: '10px',
           color: 'var(--text-dim)',
+          fontFamily: 'var(--font-mono)',
         }}
       >
-        <span>SYNCHRONIZED WITH FOREX FACTORY</span>
-        <span>SHOWING {filteredEvents.length} SCHEDULED EVENTS</span>
+        <span>FOREX FACTORY FEED</span>
+        <span>{filteredEvents.length} SCHEDULED</span>
       </div>
     </div>
   );

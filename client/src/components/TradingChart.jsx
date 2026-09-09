@@ -1,8 +1,8 @@
 // client/src/components/TradingChart.jsx
-// Professional TradingView Live Workstation for XAU/USD Spot Gold
+// Professional High-Density TradingView Workstation with Compact Single-Row Price & Pivot Ticker
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Layers, Maximize2, ExternalLink, ShieldAlert, Radio } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 
 export default function TradingChart({ prices = {} }) {
   const [interval, setInterval] = useState('5'); // '1', '5', '15', '60', '240', 'D'
@@ -18,7 +18,7 @@ export default function TradingChart({ prices = {} }) {
     if (spotPrice && prevPriceRef.current && spotPrice !== prevPriceRef.current) {
       const dir = spotPrice > prevPriceRef.current ? 'up' : 'down';
       setTickDirection(dir);
-      const timer = setTimeout(() => setTickDirection(null), 400);
+      const timer = setTimeout(() => setTickDirection(null), 350);
       prevPriceRef.current = spotPrice;
       return () => clearTimeout(timer);
     }
@@ -63,145 +63,85 @@ export default function TradingChart({ prices = {} }) {
     { label: '15M', val: '15' },
     { label: '1H', val: '60' },
     { label: '4H', val: '240' },
-    { label: 'D', val: 'D' },
+    { label: '1D', val: 'D' },
   ];
 
-  // TradingView embed URL with custom interval and dark theme
-  const tvSrc = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=OANDA%3AXAUUSD&interval=${interval}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0a0f18&studies=%5B%22MASimple%40tv-basicstudies%22%2C%22RSI%40tv-basicstudies%22%5D&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%22paneProperties.background%22%3A%22%23090e17%22%2C%22paneProperties.vertGridProperties.color%22%3A%22rgba(255%2C255%2C255%2C0.03)%22%2C%22paneProperties.horzGridProperties.color%22%3A%22rgba(255%2C255%2C0.03)%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&utm_source=localhost`;
-
-  const activeTf = intervals.find((t) => t.val === interval) || { label: '5M', val: '5' };
-  const tfData = gold.intervals?.[interval];
-
-  let displayPercent = 0;
-  let displayAbs = null;
-
-  if (tfData && typeof tfData.chp === 'number') {
-    displayPercent = tfData.chp;
-    displayAbs = tfData.ch;
-  } else if (interval === 'D') {
-    displayPercent = parseFloat(gold.changeDay || 0);
-    displayAbs = typeof gold.changeAbs === 'number' ? parseFloat(gold.changeAbs.toFixed(2)) : null;
-  } else if (interval === '5' && gold.change5m !== undefined) {
-    displayPercent = parseFloat(gold.change5m || 0);
-    displayAbs = spotPrice > 0 ? parseFloat(((spotPrice * displayPercent) / 100).toFixed(2)) : null;
-  } else {
-    displayPercent = parseFloat(gold.changeDay || 0);
-    displayAbs = typeof gold.changeAbs === 'number' ? parseFloat(gold.changeAbs.toFixed(2)) : null;
-  }
+  const changePercent = parseFloat(gold.changeDay || gold.change5m || 0);
+  const isUp = changePercent >= 0;
 
   const bid = gold.bid ? parseFloat(gold.bid).toFixed(2) : null;
   const ask = gold.ask ? parseFloat(gold.ask).toFixed(2) : null;
   const spread = (bid && ask && parseFloat(ask) >= parseFloat(bid)) ? (parseFloat(ask) - parseFloat(bid)).toFixed(2) : null;
 
+  // TradingView embed URL with custom interval and dark theme
+  const tvSrc = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=OANDA%3AXAUUSD&interval=${interval}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0a0f18&studies=%5B%22MASimple%40tv-basicstudies%22%2C%22RSI%40tv-basicstudies%22%5D&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%22paneProperties.background%22%3A%22%230B0E14%22%2C%22paneProperties.vertGridProperties.color%22%3A%22rgba(255%2C255%2C255%2C0.03)%22%2C%22paneProperties.horzGridProperties.color%22%3A%22rgba(255%2C255%2C0.03)%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&utm_source=localhost`;
+
   return (
-    <div className="panel-card" style={{ padding: '16px' }}>
-      {/* Chart Top Header & Level Bar */}
-      <div className="chart-header-stats">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                LIVE SPOT GOLD &bull; OANDA:XAUUSD
-              </span>
-              <span className="live-tick-pulse" title="Real-time WebSocket Streaming Active">
-                <span className="live-tick-dot"></span>
-                <span>STREAMING</span>
-              </span>
-            </div>
-            <div className="spot-price-big">
-              <span className={`spot-price-value ${tickDirection === 'up' ? 'tick-flash-up' : tickDirection === 'down' ? 'tick-flash-down' : ''}`}>
-                ${spotPrice > 0 ? spotPrice.toFixed(2) : '--'}
-              </span>
-              <span
-                className="spot-price-change"
-                style={{ color: displayPercent >= 0 ? 'var(--bull-glow)' : 'var(--bear-glow)' }}
-                title={`${activeTf.label} Candle: ${displayAbs !== null ? (displayAbs >= 0 ? '+' : '') + displayAbs.toFixed(2) : ''} (${displayPercent >= 0 ? '+' : ''}${displayPercent.toFixed(2)}%) | 24h Change: ${gold.changeDay || 0}%`}
-              >
-                {displayAbs !== null && (
-                  <span style={{ marginRight: '4px', opacity: 0.9 }}>
-                    {displayAbs >= 0 ? '+' : ''}{displayAbs.toFixed(2)}
-                  </span>
-                )}
-                ({displayPercent >= 0 ? '+' : ''}{displayPercent.toFixed(2)}%)
-              </span>
-              <span
-                style={{
-                  fontSize: '10px',
-                  padding: '1px 5px',
-                  borderRadius: '3px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: 'var(--text-dim)',
-                  fontWeight: 600,
-                  letterSpacing: '0.5px',
-                  lineHeight: 'normal',
-                }}
-              >
-                {activeTf.label}
-              </span>
-              {interval !== 'D' && gold.changeDay !== undefined && (
-                <span
-                  style={{
-                    fontSize: '10px',
-                    padding: '1px 6px',
-                    borderRadius: '3px',
-                    background: 'rgba(255, 215, 0, 0.08)',
-                    border: '1px solid rgba(255, 215, 0, 0.18)',
-                    color: 'var(--gold-glow)',
-                    fontWeight: 600,
-                    letterSpacing: '0.5px',
-                    lineHeight: 'normal',
-                  }}
-                  title="24-Hour Net Session Change"
-                >
-                  24H: {parseFloat(gold.changeDay) >= 0 ? '+' : ''}{parseFloat(gold.changeDay).toFixed(2)}%
-                </span>
-              )}
-            </div>
-            {bid && ask && (
-              <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
-                BID <strong style={{ color: '#fff' }}>${bid}</strong> &bull; ASK <strong style={{ color: '#fff' }}>${ask}</strong>
-                {spread && <span style={{ marginLeft: '6px', color: 'var(--text-muted)' }}>(Spread ${spread})</span>}
-              </div>
-            )}
+    <div className="panel-card" style={{ gap: '8px' }}>
+      {/* Integrated Single-Row Price, Ticker, Pivots, and Timeframe Header */}
+      <div className="chart-price-ticker-row">
+        {/* Left: Spot Price & Live Metrics */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="spot-price-big">
+            <span className={`spot-price-value ${tickDirection === 'up' ? 'tick-flash-up' : tickDirection === 'down' ? 'tick-flash-down' : ''}`}>
+              ${spotPrice > 0 ? spotPrice.toFixed(2) : '--'}
+            </span>
+            <span
+              className="spot-price-change"
+              style={{ color: isUp ? 'var(--bull-primary)' : 'var(--bear-primary)' }}
+            >
+              {isUp ? '+' : ''}{changePercent.toFixed(2)}%
+            </span>
           </div>
 
-          {/* Institutional Timeframe Selector */}
-          <div className="filter-pills-row">
+          {bid && ask && (
+            <div className="spot-price-meta">
+              <span>BID <strong style={{ color: 'var(--text-main)' }}>${bid}</strong></span>
+              <span style={{ margin: '0 4px', opacity: 0.4 }}>/</span>
+              <span>ASK <strong style={{ color: 'var(--text-main)' }}>${ask}</strong></span>
+              {spread && <span style={{ marginLeft: '6px', color: 'var(--text-dim)' }}>(Spr ${spread})</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Center: Clean Monospace Floor Pivots Ribbon */}
+        <div className="chart-pivots-ribbon">
+          <span className="pivot-tag r2" title="Resistance 2">R2 ${pivots.r2}</span>
+          <span className="pivot-tag r1" title="Resistance 1">R1 ${pivots.r1}</span>
+          <span className="pivot-tag p" title="Equilibrium Pivot">P ${pivots.p}</span>
+          <span className="pivot-tag s1" title="Support 1">S1 ${pivots.s1}</span>
+          <span className="pivot-tag s2" title="Support 2">S2 ${pivots.s2}</span>
+        </div>
+
+        {/* Right: Minimalist Timeframe Segmented Control & TV Link */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="timeframe-segment-control">
             {intervals.map((tf) => (
               <button
                 key={tf.val}
-                className={`filter-pill ${interval === tf.val ? 'active' : ''}`}
+                className={`timeframe-btn ${interval === tf.val ? 'active' : ''}`}
                 onClick={() => setInterval(tf.val)}
               >
                 {tf.label}
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Pivot Points Ribbon */}
-        <div className="chart-pivots-ribbon">
-          <span className="pivot-tag r2" title="Resistance 2">R2 ${pivots.r2}</span>
-          <span className="pivot-tag r1" title="Resistance 1">R1 ${pivots.r1}</span>
-          <span className="pivot-tag p" title="Pivot Point">P ${pivots.p}</span>
-          <span className="pivot-tag s1" title="Support 1">S1 ${pivots.s1}</span>
-          <span className="pivot-tag s2" title="Support 2">S2 ${pivots.s2}</span>
 
           <a
             href="https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD"
             target="_blank"
             rel="noopener noreferrer"
-            className="filter-pill"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+            className="btn-ghost-icon"
+            style={{ width: '26px', height: '26px' }}
+            title="Open Full TradingView Chart in New Window"
           >
-            <ExternalLink size={11} />
-            <span>Full TV</span>
+            <ExternalLink size={12} />
           </a>
         </div>
       </div>
 
-      {/* TradingView Live Container (replaces tick canvas) */}
-      <div className="interactive-chart-box" style={{ height: '480px' }}>
+      {/* TradingView Interactive Chart Container */}
+      <div className="interactive-chart-box">
         <iframe
           key={interval}
           title="TradingView Live XAUUSD Chart"
