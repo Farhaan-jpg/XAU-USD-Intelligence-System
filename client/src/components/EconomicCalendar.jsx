@@ -146,9 +146,9 @@ export default function EconomicCalendar({ calendarData = {} }) {
         </div>
       )}
 
-      {/* Events Table */}
-      <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
-        <table className="calendar-events-table">
+      {/* Events Table (Responsive scroll wrapper) */}
+      <div style={{ maxHeight: '380px', overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table className="calendar-events-table" style={{ minWidth: '540px' }}>
           <thead>
             <tr>
               <th style={{ width: '85px' }}>TIME (UTC)</th>

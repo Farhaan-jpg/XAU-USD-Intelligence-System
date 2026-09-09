@@ -1243,3 +1243,158 @@ body {
   color: var(--text-muted);
 }
 
+/* ==========================================================================
+   Comprehensive Mobile & Tablet Responsiveness Overrides
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  /* Header */
+  .terminal-header {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .brand-title {
+    font-size: 14px;
+  }
+
+  .brand-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  .header-telemetry {
+    width: 100%;
+    order: 3;
+    justify-content: space-between;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .telemetry-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+
+  /* Navigation Bar */
+  .nav-tabs-bar {
+    padding: 0 10px;
+    gap: 4px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .nav-tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    padding: 10px 12px;
+    font-size: 11px;
+    gap: 5px;
+  }
+
+  /* Main Workspace */
+  .terminal-main {
+    padding: 10px 10px;
+    gap: 12px;
+  }
+
+  /* Event Banner */
+  .event-alert-banner {
+    padding: 10px 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* Chart Area */
+  .chart-header-stats {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .spot-price-big {
+    font-size: 22px;
+  }
+
+  .interactive-chart-box {
+    height: 380px !important;
+  }
+
+  .chart-pivots-ribbon {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pivot-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  /* Cards & Grids */
+  .panel-card {
+    padding: 12px;
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+  }
+
+  .copilot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-levels-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .calc-inputs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calc-result-box {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Footer */
+  .terminal-footer {
+    padding: 6px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .footer-ticks {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .setup-levels-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .interactive-chart-box {
+    height: 340px !important;
+  }
+
+  .news-feed-container {
+    max-height: 400px;
+  }
+}
+
+
