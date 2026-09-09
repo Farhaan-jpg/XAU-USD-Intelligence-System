@@ -51,31 +51,36 @@ const config = {
     OIL: 'CL=F',           // WTI Crude Oil
   },
 
-  // Reputed Institutional Real-Time RSS News Feeds (No Delayed Aggregators like Yahoo Finance)
+  // Reputed Institutional Real-Time RSS News Feeds (Tier-1 Sources)
   rssFeeds: [
-    { name: 'FinancialJuice Wire', url: 'https://www.financialjuice.com/feed.ashx' }, // Real-time institutional financial squawk/breaking wire
-    { name: 'ForexLive Instant', url: 'https://www.forexlive.com/feed/news' },         // Fast FX & central bank breaking news
-    { name: 'FXStreet Live', url: 'https://www.fxstreet.com/rss/news' },               // Institutional Gold & macro coverage
-    { name: 'Reuters Business Wire', url: 'https://feeds.feedburner.com/reuters/businessNews' }, // Global Tier-1 breaking wire
-    { name: 'Investing.com Gold', url: 'https://www.investing.com/rss/news_25.rss' },  // Gold specific spot analysis & flow
-    { name: 'Investing.com Commodities', url: 'https://www.investing.com/rss/commodities.rss' }, // Metals & energy macro
-    { name: 'MarketWatch Top Wire', url: 'https://feeds.marketwatch.com/marketwatch/topstories/' }, // US Treasury & Fed flow
-    { name: 'Al Jazeera Breaking', url: 'https://www.aljazeera.com/xml/rss/all.xml' }, // Geopolitical safe-haven escalations
-    { name: 'BBC World Wire', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },     // Geopolitics & international sanctions
+    { name: 'Investing.com Gold', url: 'https://www.investing.com/rss/news_25.rss' },
+    { name: 'Investing.com Commodities', url: 'https://www.investing.com/rss/commodities.rss' },
+    { name: 'Investing.com Economy', url: 'https://www.investing.com/rss/news_14.rss' },
+    { name: 'Investing.com Forex', url: 'https://www.investing.com/rss/news_1.rss' },
+    { name: 'Al Jazeera Breaking', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+    { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml' },
+    { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+    { name: 'CNBC Commodities', url: 'https://www.cnbc.com/id/19836768/device/rss/rss.html' },
+    { name: 'CNBC Economy', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
+    { name: 'FXStreet Live', url: 'https://www.fxstreet.com/rss/news' },
+    { name: 'ForexLive Instant', url: 'https://www.forexlive.com/feed/news' },
+    { name: 'FinancialJuice Wire', url: 'https://www.financialjuice.com/feed.ashx' },
   ],
 
-  // Gold-relevance trigger keywords
+  // Gold, macro & geopolitical trigger keywords
   goldKeywords: [
-    'gold', 'xau', 'federal reserve', 'fed', 'fomc', 'rate cut', 'rate hike',
-    'interest rate', 'cpi', 'inflation', 'nfp', 'non-farm', 'payroll',
-    'treasury', 'yield', 'dollar', 'dxy', 'geopolitical', 'central bank',
-    'china gold', 'safe haven', 'precious metal', 'bullion', 'pce', 'core pce',
-    'jerome powell', 'powell', 'recession', 'ukraine', 'middle east', 'war',
-    'sanctions', 'oil', 'crude', 'risk off', 'risk on', 'silver', 'commodity',
-    'bond', 'deficit', 'debt ceiling', 'quantitative', 'qe', 'qt',
+    'gold', 'xau', 'silver', 'xag', 'bullion', 'precious metal', 'commodity',
+    'federal reserve', 'fed', 'fomc', 'rate cut', 'rate hike', 'interest rate',
+    'cpi', 'inflation', 'deflation', 'nfp', 'non-farm', 'payroll', 'jobless',
+    'unemployment', 'pce', 'core pce', 'gdp', 'pmi', 'retail sales',
+    'treasury', 'yield', 'dollar', 'dxy', 'usd', 'central bank', 'ecb', 'boe', 'boj', 'pboc',
+    'china gold', 'safe haven', 'jerome powell', 'powell', 'yellen', 'bessent',
+    'recession', 'stagflation', 'hard landing', 'soft landing',
+    'ukraine', 'middle east', 'war', 'sanctions', 'oil', 'crude', 'brent', 'wti',
+    'risk off', 'risk on', 'bond', 'deficit', 'debt ceiling', 'quantitative', 'qe', 'qt',
     'iran', 'israel', 'lebanon', 'gaza', 'houthi', 'red sea', 'strait of hormuz',
     'missile', 'airstrike', 'strike', 'escalation', 'ceasefire', 'taiwan',
-    'russia', 'nato', 'tariff', 'trade war',
+    'russia', 'nato', 'tariff', 'trade war', 'geopolitical', 'opec',
   ],
 };
 

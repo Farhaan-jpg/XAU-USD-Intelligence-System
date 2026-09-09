@@ -292,7 +292,7 @@ io.on('connection', (socket) => {
 
   const latestNews = newsEngine.getLatest();
   if (latestNews.length > 0) {
-    socket.emit('news_batch', latestNews.slice(0, 20));
+    socket.emit('news_batch', latestNews.slice(0, 35));
   }
 
   const calendarData = calendarEngine.getData();

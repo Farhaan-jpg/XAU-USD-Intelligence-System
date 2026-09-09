@@ -1,14 +1,31 @@
-// client/src/components/NewsTerminal.jsx
-// Minimalist Financial News Wire with Impact Dots, Tabular Timestamps, and AI Reasoning
-
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Newspaper, Copy, Check, Volume2 } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
+
+function formatTimeAgo(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0 || isNaN(diffMs)) return 'Just now';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export default function NewsTerminal({ newsFeed = [] }) {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'HIGH' | 'BULLISH' | 'BEARISH' | 'GEO'
   const [copiedId, setCopiedId] = useState(null);
   const [squawkingId, setSquawkingId] = useState(null);
+  const [tick, setTick] = useState(0);
+
+  // Auto-tick every 15 seconds to update relative times
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 15000);
+    return () => clearInterval(timer);
+  }, []);
 
   const filteredNews = useMemo(() => {
     return newsFeed.filter((item) => {
@@ -117,8 +134,11 @@ export default function NewsTerminal({ newsFeed = [] }) {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
-                      {item.publishedAt ? new Date(item.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    <span
+                      style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', cursor: 'default' }}
+                      title={item.publishedAt ? new Date(item.publishedAt).toUTCString() : ''}
+                    >
+                      {formatTimeAgo(item.publishedAt)}
                     </span>
                     <button
                       className="btn-ghost-icon"

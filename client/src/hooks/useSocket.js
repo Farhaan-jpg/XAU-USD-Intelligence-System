@@ -87,12 +87,23 @@ export function useSocket() {
       }
     };
 
+    const sortNewsByDate = (items) => {
+      return [...items].sort((a, b) => {
+        const tA = new Date(a.publishedAt || a.processedAt || 0).getTime();
+        const tB = new Date(b.publishedAt || b.processedAt || 0).getTime();
+        return tB - tA;
+      });
+    };
+
     const onNewsItem = (item) => {
       setNewsFeed((prev) => {
-        const exists = prev.some((n) => n.id === item.id);
-        if (exists) return prev;
-        const next = [item, ...prev].slice(0, 50);
-        return next;
+        const map = new Map();
+        map.set(item.id || item.guid, item);
+        prev.forEach((n) => {
+          const k = n.id || n.guid;
+          if (!map.has(k)) map.set(k, n);
+        });
+        return sortNewsByDate(Array.from(map.values())).slice(0, 50);
       });
 
       // Set as latest alert for notification effects
@@ -103,15 +114,23 @@ export function useSocket() {
 
     const onNewsBatch = (items) => {
       setNewsFeed((prev) => {
-        const existingIds = new Set(prev.map((n) => n.id));
-        const newItems = items.filter((n) => !existingIds.has(n.id));
-        return [...newItems, ...prev].slice(0, 50);
+        const map = new Map();
+        items.forEach((item) => map.set(item.id || item.guid, item));
+        prev.forEach((n) => {
+          const k = n.id || n.guid;
+          if (!map.has(k)) map.set(k, n);
+        });
+        return sortNewsByDate(Array.from(map.values())).slice(0, 50);
       });
     };
 
     const onNewsItemUpdate = (updatedItem) => {
       setNewsFeed((prev) =>
-        prev.map((item) => (item.id === updatedItem.id ? { ...item, ...updatedItem } : item))
+        prev.map((item) =>
+          (item.id === updatedItem.id || (item.guid && item.guid === updatedItem.guid))
+            ? { ...item, ...updatedItem }
+            : item
+        )
       );
       if (updatedItem.impact === 'HIGH') {
         setLatestAlert(updatedItem);
