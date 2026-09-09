@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const { connected, latency, prices, newsFeed, calendarData, latestAlert } = useSocket();
+  const { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert } = useSocket();
   const [activeTab, setActiveTab] = useState('TERMINAL'); // 'TERMINAL' | 'COPILOT' | 'MACRO' | 'NEWS' | 'CALENDAR' | 'CALCULATOR'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [aiTelemetry, setAiTelemetry] = useState({});
@@ -181,7 +181,7 @@ export default function App() {
             <div className="grid-terminal-top">
               <TradingChart prices={prices} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+                <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
                 <RiskCalculator currentGoldPrice={currentGoldPrice} />
               </div>
             </div>
@@ -193,7 +193,7 @@ export default function App() {
             <MacroRadar prices={prices} />
 
             {/* CFTC Institutional Speculator vs Commercial Sentiment */}
-            <COTSentimentGauge />
+            <COTSentimentGauge cotData={cotData} />
 
             {/* Full-Width AI Trade Copilot & Institutional Scenario Playbook */}
             <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
@@ -210,7 +210,7 @@ export default function App() {
         {activeTab === 'COPILOT' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
-            <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <RiskCalculator currentGoldPrice={currentGoldPrice} />
           </div>
         )}
@@ -243,8 +243,8 @@ export default function App() {
         {/* Tab 6: COT Positioning Focus */}
         {activeTab === 'COT' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <COTSentimentGauge />
-            <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <COTSentimentGauge cotData={cotData} />
+            <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <MacroRadar prices={prices} />
           </div>
         )}

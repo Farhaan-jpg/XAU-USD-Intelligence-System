@@ -13,6 +13,7 @@ const config = require('./config');
 const priceEngine = require('./engines/priceEngine');
 const newsEngine = require('./engines/newsEngine');
 const calendarEngine = require('./engines/calendarEngine');
+const cotEngine = require('./engines/cotEngine');
 const telegramEngine = require('./engines/telegramEngine');
 const aiOrchestrator = require('./utils/aiOrchestrator');
 const fs = require('fs');
@@ -44,6 +45,7 @@ app.get('/api/health', (req, res) => {
       price: true,
       news: true,
       calendar: true,
+      cot: true,
       telegram: true,
     },
   });
@@ -51,6 +53,10 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/prices', (req, res) => {
   res.json(priceEngine.getLatest());
+});
+
+app.get('/api/cot', (req, res) => {
+  res.json(cotEngine.getData());
 });
 
 app.get('/api/news', (req, res) => {
@@ -253,6 +259,9 @@ io.on('connection', (socket) => {
   const calendarData = calendarEngine.getData();
   socket.emit('calendar_update', { ...calendarData, serverTime: new Date().toISOString() });
 
+  const cotData = cotEngine.getData();
+  socket.emit('cot_update', cotData);
+
   socket.on('ping_pong', () => socket.emit('ping_pong', { ts: Date.now() }));
 
   socket.on('disconnect', (reason) => {
@@ -283,11 +292,13 @@ async function bootstrap() {
   priceEngine.init(io);
   newsEngine.init(io);
   calendarEngine.init(io);
+  cotEngine.init(io);
 
   // Start all engines
   priceEngine.start();
   newsEngine.start();
   calendarEngine.start();
+  cotEngine.start();
 
   // Send Telegram startup confirmation
   setTimeout(() => {
@@ -310,6 +321,7 @@ process.on('SIGINT', () => {
   priceEngine.stop();
   newsEngine.stop();
   calendarEngine.stop();
+  cotEngine.stop();
   server.close(() => process.exit(0));
 });
 

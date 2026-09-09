@@ -264,6 +264,13 @@ class TVStreamer {
 
       latestPrices['GC=F'] = goldData;
       latestPrices['XAUUSD'] = goldData;
+      
+      // Update real-time retail sentiment flow with live gold price
+      try {
+        const cotEngine = require('./cotEngine');
+        cotEngine.updateWithLivePrice(newPrice, goldData.change5m);
+      } catch (_) {}
+
       scheduleBroadcast();
     } else if (isSilver) {
       const existing = latestPrices['SI=F'] || {};
@@ -308,6 +315,62 @@ class TVStreamer {
 
       latestPrices['SI=F'] = silverData;
       latestPrices['XAGUSD'] = silverData;
+      scheduleBroadcast();
+    } else {
+      // Real-time macro stream: DXY, US10Y, US02Y, USDJPY, USOIL
+      const symbolMap = {
+        'TVC:DXY': 'DX-Y.NYB',
+        'TVC:US10Y': '^TNX',
+        'TVC:US02Y': '^IRX',
+        'OANDA:USDJPY': 'JPY=X',
+        'TVC:USOIL': 'CL=F',
+      };
+      const targetSymbol = symbolMap[sym];
+      if (!targetSymbol) return;
+
+      const isYield = targetSymbol.includes('TNX') || targetSymbol.includes('IRX');
+      const decimals = isYield ? 3 : 2;
+      const existing = latestPrices[targetSymbol] || {};
+      const newPrice = v.lp !== undefined && v.lp !== null ? parseFloat(v.lp.toFixed(decimals)) :
+        (v.bid && v.ask ? parseFloat(((v.bid + v.ask) / 2).toFixed(decimals)) : existing.price);
+      if (newPrice === undefined || isNaN(newPrice)) return;
+
+      const bid = v.bid !== undefined && v.bid !== null ? parseFloat(v.bid.toFixed(decimals)) : (existing.bid || newPrice);
+      const ask = v.ask !== undefined && v.ask !== null ? parseFloat(v.ask.toFixed(decimals)) : (existing.ask || newPrice);
+      const high = v.high_price ? parseFloat(v.high_price.toFixed(decimals)) : (existing.high ? Math.max(existing.high, newPrice) : newPrice);
+      const low = v.low_price ? parseFloat(v.low_price.toFixed(decimals)) : (existing.low ? Math.min(existing.low, newPrice) : newPrice);
+      const open = v.open_price ? parseFloat(v.open_price.toFixed(decimals)) : (existing.open || newPrice);
+      const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
+      const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(decimals)) : (existing.changeAbs || 0);
+
+      if (!priceHistory[targetSymbol]) priceHistory[targetSymbol] = [];
+      priceHistory[targetSymbol].push({ price: newPrice, ts: Date.now() });
+      if (priceHistory[targetSymbol].length > BUFFER_SIZE) priceHistory[targetSymbol].shift();
+      const oldest = priceHistory[targetSymbol][0]?.price;
+      const change5m = oldest ? ((newPrice - oldest) / oldest) * 100 : 0;
+      const meta = INSTRUMENT_META[targetSymbol] || {};
+
+      latestPrices[targetSymbol] = {
+        symbol: targetSymbol,
+        label: meta.label || targetSymbol,
+        description: meta.description || sym,
+        unit: meta.unit || '',
+        correlation: meta.correlation || 'unknown',
+        price: newPrice,
+        change5m: parseFloat(change5m.toFixed(4)),
+        changeDay: chp,
+        changeAbs: ch,
+        bid,
+        ask,
+        high,
+        low,
+        open,
+        volume: v.volume || existing.volume || 0,
+        direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
+        updatedAt: new Date().toISOString(),
+        latency: 'REALTIME_WEBSOCKET',
+        source: `${sym}_STREAM`,
+      };
       scheduleBroadcast();
     }
   }
@@ -462,11 +525,16 @@ async function fetchAllPrices() {
 
   const wsActive = Date.now() - lastWsTickTime < 10000;
 
-  // If WebSocket is active, only fetch macro quotes from Yahoo Finance
+  // If WebSocket is active, all 7 assets stream live ticks sub-second with zero delay.
+  // We only poll Yahoo Finance if WebSocket is inactive as fallback.
+  if (wsActive) {
+    return results;
+  }
+
   const promises = [
-    wsActive ? Promise.resolve(null) : fetchLiveGoldSpot(),
-    wsActive ? Promise.resolve(null) : fetchLiveSilverSpot(),
-    ...macroSymbols.map((sym) => yahooFinance.quote(sym)),
+    fetchLiveGoldSpot(),
+    fetchLiveSilverSpot(),
+    ...macroSymbols.map((sym) => yahooFinance.quote(sym).catch(() => null)),
   ];
 
   const [goldSpotRes, silverSpotRes, ...yahooQuotes] = await Promise.allSettled(promises);
@@ -595,7 +663,8 @@ async function fetchAllPrices() {
       volume: quote?.regularMarketVolume || 0,
       direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
       updatedAt: new Date().toISOString(),
-      latency: 'STREAM',
+      latency: 'FALLBACK_HTTP',
+      source: quote?.source || 'YAHOO_FINANCE',
     };
   });
 
@@ -617,9 +686,17 @@ function start() {
   isRunning = true;
   console.log('[PRICE] Real-time sub-second WebSocket tick streamer starting...');
 
-  // Start live TradingView quote WebSocket
+  // Start live TradingView quote WebSocket for all 7 assets
   if (!tvStreamer) {
-    tvStreamer = new TVStreamer(['OANDA:XAUUSD', 'TVC:SILVER']);
+    tvStreamer = new TVStreamer([
+      'OANDA:XAUUSD',
+      'TVC:SILVER',
+      'TVC:DXY',
+      'TVC:US10Y',
+      'TVC:US02Y',
+      'OANDA:USDJPY',
+      'TVC:USOIL',
+    ]);
   }
 
   // Immediate first poll for macro instruments

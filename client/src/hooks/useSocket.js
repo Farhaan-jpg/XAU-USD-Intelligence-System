@@ -29,6 +29,7 @@ export function useSocket() {
   const [prices, setPrices] = useState({});
   const [newsFeed, setNewsFeed] = useState([]);
   const [calendarData, setCalendarData] = useState(null);
+  const [cotData, setCotData] = useState(null);
   const [latestAlert, setLatestAlert] = useState(null);
 
   const measureLatency = useCallback((socket) => {
@@ -54,6 +55,14 @@ export function useSocket() {
         .catch(() => {});
     };
     fetchLatestPrices();
+
+    // Initial fetch for COT & Retail sentiment
+    fetch('/api/cot')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCotData(data);
+      })
+      .catch(() => {});
 
     // Backup polling every 2.5s if socket connection is pending or recovering
     const backupPollInterval = setInterval(fetchLatestPrices, 2500);
@@ -123,6 +132,10 @@ export function useSocket() {
       setCalendarData(data);
     };
 
+    const onCotUpdate = (data) => {
+      if (data) setCotData(data);
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('price_update', onPriceUpdate);
@@ -130,6 +143,7 @@ export function useSocket() {
     socket.on('news_item_update', onNewsItemUpdate);
     socket.on('news_batch', onNewsBatch);
     socket.on('calendar_update', onCalendarUpdate);
+    socket.on('cot_update', onCotUpdate);
 
     // Sync initial state if already connected
     if (socket.connected) {
@@ -145,10 +159,11 @@ export function useSocket() {
       socket.off('news_item_update', onNewsItemUpdate);
       socket.off('news_batch', onNewsBatch);
       socket.off('calendar_update', onCalendarUpdate);
+      socket.off('cot_update', onCotUpdate);
       if (pingTimerRef.current) clearInterval(pingTimerRef.current);
       clearInterval(backupPollInterval);
     };
   }, [measureLatency]);
 
-  return { connected, latency, prices, newsFeed, calendarData, latestAlert };
+  return { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert };
 }

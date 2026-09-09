@@ -9,31 +9,44 @@ export default function SmartLiquidityRadar({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
 
-  // Compute ICT Institutional SMC Levels dynamically based on spot
+  // Compute ICT Institutional SMC Levels dynamically based on live spot and session range
   const smcLevels = useMemo(() => {
     const p = spotPrice || 4400;
+    const high = parseFloat(gold.high || 0);
+    const low = parseFloat(gold.low || 0);
 
+    if (high > 0 && low > 0 && high > low) {
+      const range = high - low;
+      const eq = (high + low) / 2;
+      const bslMajor = high + Math.max(2.5, range * 0.06);
+      const sslMajor = low - Math.max(2.5, range * 0.06);
+
+      return {
+        bslMajor: bslMajor.toFixed(2),
+        bslMinor: high.toFixed(2),
+        sslMinor: low.toFixed(2),
+        sslMajor: sslMajor.toFixed(2),
+        bullishOB: `${low.toFixed(2)} - ${(low + range * 0.12).toFixed(2)}`,
+        bearishOB: `${(high - range * 0.12).toFixed(2)} - ${high.toFixed(2)}`,
+        fvgPremium: `${(eq + range * 0.12).toFixed(2)} - ${(eq + range * 0.22).toFixed(2)}`,
+        fvgDiscount: `${(eq - range * 0.22).toFixed(2)} - ${(eq - range * 0.12).toFixed(2)}`,
+        equilibrium: eq.toFixed(2),
+      };
+    }
+
+    // Volatility-calibrated fallback if session range is pending
     return {
-      // Buy-Side Liquidity (BSL) resting stop pools
       bslMajor: (p + 16.80).toFixed(2),
       bslMinor: (p + 8.40).toFixed(2),
-
-      // Sell-Side Liquidity (SSL) resting stop pools
       sslMinor: (p - 8.20).toFixed(2),
       sslMajor: (p - 17.50).toFixed(2),
-
-      // Institutional Order Blocks (OB)
       bullishOB: `${(p - 12.00).toFixed(2)} - ${(p - 9.50).toFixed(2)}`,
       bearishOB: `${(p + 9.80).toFixed(2)} - ${(p + 12.40).toFixed(2)}`,
-
-      // Fair Value Gaps (FVG) Imbalance Zones
       fvgPremium: `${(p + 5.20).toFixed(2)} - ${(p + 6.80).toFixed(2)}`,
       fvgDiscount: `${(p - 6.50).toFixed(2)} - ${(p - 4.90).toFixed(2)}`,
-
-      // Institutional Equilibrium 50% Level
       equilibrium: p.toFixed(2),
     };
-  }, [spotPrice]);
+  }, [spotPrice, gold.high, gold.low]);
 
   return (
     <div className="panel-card">

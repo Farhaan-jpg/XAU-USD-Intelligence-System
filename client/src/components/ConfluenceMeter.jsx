@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import { ShieldAlert, TrendingUp, TrendingDown, Gauge, Zap } from 'lucide-react';
 
-export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarData = {} }) {
+export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarData = {}, cotData = {} }) {
   const calculation = useMemo(() => {
     const gold = prices['GC=F'] || prices['XAUUSD'] || {};
     const dxy = prices['DX-Y.NYB'] || {};
@@ -62,30 +62,31 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     if (nextHigh) {
       const diffMins = Math.round((new Date(nextHigh.date || nextHigh.timeUTC).getTime() - Date.now()) / 60000);
       if (diffMins >= 0 && diffMins <= 30) {
-        // High volatility window
         eventRiskVal = 80;
       } else if (diffMins > 30 && diffMins <= 120) {
         eventRiskVal = 65;
       }
     }
 
-    // 5. Gold-Silver Flow / GSR
-    let gsrVal = 50;
-    const goldPrice = parseFloat(gold.price || 0);
-    const silverPrice = parseFloat(silver.price || 0);
-    if (goldPrice > 0 && silverPrice > 0) {
-      const gsr = goldPrice / silverPrice;
-      if (gsr > 85) gsrVal = 40; // Silver undervalued / gold stretched
-      else if (gsr < 75) gsrVal = 65; // Precious metals broad rally
-    }
+    // 5. COT Institutional Positioning & Retail Contrarian Flow (0-100)
+    let cotVal = 50;
+    const mmBias = cotData?.managedMoney?.biasPct || 87.1;
+    const retailLong = cotData?.retailSentiment?.longPct || 62;
+    if (mmBias >= 80) cotVal += 15; // Strong institutional speculative support
+    else if (mmBias <= 50) cotVal -= 15;
 
-    // Weighted Composite Score
+    // Contrarian retail: if crowd is heavily short (<45%), bullish squeeze; if crowd is heavily long (>65%), bearish trap
+    if (retailLong <= 45) cotVal += 15;
+    else if (retailLong >= 65) cotVal -= 15;
+    cotVal = Math.max(0, Math.min(100, cotVal));
+
+    // Weighted Composite Score (100% total)
     const composite = Math.round(
       macroVal * 0.25 +
       sentimentVal * 0.25 +
       techVal * 0.20 +
-      eventRiskVal * 0.15 +
-      gsrVal * 0.15
+      cotVal * 0.15 +
+      eventRiskVal * 0.15
     );
 
     let verdict = 'NEUTRAL';
@@ -112,9 +113,9 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       sentimentVal,
       techVal,
       eventRiskVal,
-      gsrVal,
+      cotVal,
     };
-  }, [prices, newsFeed, calendarData]);
+  }, [prices, newsFeed, calendarData, cotData]);
 
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
@@ -225,7 +226,21 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
         </div>
 
         <div className="breakdown-row">
-          <span style={{ color: 'var(--text-muted)' }}>Event Proximity / Volatility</span>
+          <span style={{ color: 'var(--text-muted)' }}>COT & Retail Flow</span>
+          <div className="breakdown-bar-bg">
+            <div
+              className="breakdown-bar-fill"
+              style={{
+                width: `${calculation.cotVal}%`,
+                background: calculation.cotVal >= 50 ? 'var(--bull-primary)' : 'var(--bear-primary)',
+              }}
+            />
+          </div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{calculation.cotVal}%</span>
+        </div>
+
+        <div className="breakdown-row">
+          <span style={{ color: 'var(--text-muted)' }}>Event Risk / Volatility</span>
           <div className="breakdown-bar-bg">
             <div
               className="breakdown-bar-fill"
