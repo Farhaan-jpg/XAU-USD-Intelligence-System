@@ -7,7 +7,7 @@ import Header from './components/Header';
 import TradingChart from './components/TradingChart';
 import ConfluenceMeter from './components/ConfluenceMeter';
 import MacroRadar from './components/MacroRadar';
-import AICopilot from './components/AICopilot';
+import AIMarketGuidance from './components/AIMarketGuidance';
 import SessionClock from './components/SessionClock';
 import RiskCalculator from './components/RiskCalculator';
 import NewsTerminal from './components/NewsTerminal';
@@ -88,12 +88,12 @@ export default function App() {
         </button>
 
         <button
-          className={`tab-btn ${activeTab === 'COPILOT' ? 'active' : ''}`}
-          onClick={() => setActiveTab('COPILOT')}
+          className={`tab-btn ${activeTab === 'GUIDANCE' ? 'active' : ''}`}
+          onClick={() => setActiveTab('GUIDANCE')}
         >
           <Sparkles size={15} />
-          <span>AI TRADE COPILOT</span>
-          <span className="tab-pill">GEMINI</span>
+          <span>AI MARKET GUIDANCE</span>
+          <span className="tab-pill">REGIME</span>
         </button>
 
         <button
@@ -195,8 +195,8 @@ export default function App() {
             {/* CFTC Institutional Speculator vs Commercial Sentiment */}
             <COTSentimentGauge cotData={cotData} />
 
-            {/* Full-Width AI Trade Copilot & Institutional Scenario Playbook */}
-            <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            {/* Full-Width AI Market Guidance & Volatility Risk Warnings (Zero Trade Setups) */}
+            <AIMarketGuidance prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
 
             {/* Bottom Grid: Real-Time Economic Calendar & Live News Wire Side-by-Side */}
             <div className="grid-terminal-events-news">
@@ -206,10 +206,10 @@ export default function App() {
           </>
         )}
 
-        {/* Tab 2: AI Trade Copilot Focus */}
-        {activeTab === 'COPILOT' && (
+        {/* Tab 2: AI Market Guidance Focus */}
+        {activeTab === 'GUIDANCE' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <AIMarketGuidance prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <RiskCalculator currentGoldPrice={currentGoldPrice} />
           </div>

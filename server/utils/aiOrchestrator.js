@@ -1,103 +1,73 @@
 // server/utils/aiOrchestrator.js
 // Multi-Tier Resilient AI Orchestrator
-// Priority 1: Google Gemini (Direct API, sub-second latency, structured JSON)
-// Priority 2: OpenRouter (Fallback to free/tier-1 models if Google quota exhausted)
-// Priority 3: Quant Rule Heuristic (Offline zero-delay fallback, 100% uptime)
+// Priority 1: Google Gemini (Direct API, structured JSON)
+// Priority 2: OpenRouter Auto-Fallback (Free models, capped tokens, zero token waste)
+// Zero keyword-based rules; pure AI-driven evaluation
 
 const gemini = require('./gemini');
 const openrouter = require('./openrouter');
 
-let activeProvider = 'google'; // 'google' | 'openrouter' | 'quant'
-let lastScoredProvider = 'quant';
+let lastScoredProvider = 'ai-engine';
 let aiStats = {
   googleCount: 0,
   openrouterCount: 0,
-  quantCount: 0,
+  neutralCount: 0,
   totalScored: 0,
 };
 
 /**
- * Score a news item across the resilient 3-tier cascade
+ * Score a news item using purely AI models
  */
 async function scoreNewsItem(headline, summary, source) {
   aiStats.totalScored++;
 
-  // Tier 1: Try Google Gemini first (Priority #1)
+  // Tier 1: Try Google Gemini if configured
   try {
     const result = await gemini.scoreWithGemini(headline, summary, source);
     if (result && result.impact && result.bias) {
       aiStats.googleCount++;
-      lastScoredProvider = 'google';
+      lastScoredProvider = 'Google Gemini';
       return result;
     }
-  } catch (geminiErr) {
-    // console.warn(`[AI-ORCHESTRATOR] Google Gemini unavailable: ${geminiErr.message}. Falling back to OpenRouter...`);
-  }
+  } catch (_) {}
 
-  // Tier 2: OpenRouter Fallback
+  // Tier 2: OpenRouter Free Model Fallback
   try {
     const result = await openrouter.scoreNewsItem(headline, summary, source);
-    if (result && result.model && !result.model.includes('fallback')) {
+    if (result && result.model && !result.model.includes('baseline')) {
       aiStats.openrouterCount++;
-      lastScoredProvider = 'openrouter';
+      lastScoredProvider = 'OpenRouter Free Model';
       return {
         ...result,
-        provider: 'OpenRouter',
+        provider: 'OpenRouter AI',
       };
     }
-  } catch (openrouterErr) {
-    // console.warn(`[AI-ORCHESTRATOR] OpenRouter failed: ${openrouterErr.message}. Falling back to Quant Engine...`);
-  }
+  } catch (_) {}
 
-  // Tier 3: Zero-delay Quant Heuristic Engine
-  aiStats.quantCount++;
-  lastScoredProvider = 'quant';
-  const quantResult = openrouter.keywordFallback(headline, summary, source);
+  // Tier 3: Pure Neutral Baseline (No artificial keyword bias)
+  aiStats.neutralCount++;
+  lastScoredProvider = 'Market Neutral Baseline';
   return {
-    ...quantResult,
-    provider: 'Quant Engine',
+    headline,
+    impact: 'LOW',
+    bias: 'NEUTRAL',
+    reasoning: 'Neutral market context — awaiting further AI directional catalyst.',
+    model: 'neutral-baseline',
+    provider: 'Market Engine',
+    scoredAt: new Date().toISOString(),
   };
 }
 
 /**
- * Generate AI Trade Setup & Playbook
+ * Generate AI Market Guidance & Volatility Warnings (No trade setups)
  */
-async function getTradeCopilot(marketData) {
+async function getMarketGuidance(marketData) {
+  // Try OpenRouter free models or Google Gemini for market guidance
   try {
-    return await gemini.generateTradeCopilot(marketData);
+    return await openrouter.generateMarketGuidance(marketData);
   } catch (err) {
-    console.warn(`[AI-ORCHESTRATOR] Gemini trade copilot failed (${err.message}). Generating rule-based setup.`);
-    // Algorithmic rule-based trade copilot fallback
-    const gold = parseFloat(marketData.goldPrice || 2350);
-    const goldChg = parseFloat(marketData.goldChange5m || 0);
-    const dxyChg = parseFloat(marketData.dxyChange5m || 0);
-
-    const isBull = goldChg > 0 || dxyChg < 0;
-    const bias = isBull ? 'BUY' : 'SELL';
-    const entry = isBull ? `$${(gold - 1.5).toFixed(2)} - $${gold.toFixed(2)}` : `$${gold.toFixed(2)} - $${(gold + 1.5).toFixed(2)}`;
-    const sl = isBull ? `$${(gold - 6.5).toFixed(2)}` : `$${(gold + 6.5).toFixed(2)}`;
-    const tp1 = isBull ? `$${(gold + 8.0).toFixed(2)}` : `$${(gold - 8.0).toFixed(2)}`;
-    const tp2 = isBull ? `$${(gold + 16.0).toFixed(2)}` : `$${(gold - 16.0).toFixed(2)}`;
-
-    return {
-      bias,
-      confidence: 72,
-      strategy: isBull ? 'Macro Confluence Pullback & Breakout' : 'DXY Resistance & Yield Pressure Mean Reversion',
-      entryZone: entry,
-      stopLoss: sl,
-      target1: tp1,
-      target2: tp2,
-      riskReward: '1:2.4',
-      invalidation: isBull ? `Break and close below ${sl}` : `Break and close above ${sl}`,
-      macroThesis: `Current Gold spot at $${gold.toFixed(2)} reflects ${isBull ? 'yield decline and dollar softening' : 'dollar defense and bond yield stabilization'}. Algorithmic momentum confirms ${bias.toLowerCase()} edge.`,
-      scenarioPlaybook: {
-        bullTrigger: 'Gold closes 15m candle above immediate session high with DXY testing new intraday low.',
-        bearTrigger: 'US 10Y Yield spikes above daily pivot with aggressive dollar short-covering.',
-      },
-      model: 'quant/algorithmic-engine',
-      provider: 'Quant Engine',
-      generatedAt: new Date().toISOString(),
-    };
+    console.warn(`[AI-ORCHESTRATOR] Market guidance fallback: ${err.message}`);
+    return await openrouter.generateMarketGuidance(marketData);
   }
 }
 
@@ -116,7 +86,7 @@ function getSystemTelemetry() {
 
 module.exports = {
   scoreNewsItem,
-  getTradeCopilot,
+  getMarketGuidance,
   getSystemTelemetry,
   discoverModels: gemini.discoverModels,
   updateGeminiConfig: gemini.updateConfig,

@@ -1,13 +1,14 @@
 // server/utils/openrouter.js
-// OpenRouter API wrapper for sentiment scoring
-// Returns structured JSON: { headline, impact, bias, reasoning }
+// OpenRouter API wrapper for AI news sentiment scoring & macro risk guidance
+// Uses auto-fallback free models without hardcoded keyword rules (e.g. no 'war' regex)
+// Implements aggressive prompt optimization and in-memory caching to prevent token waste
 
 const axios = require('axios');
 const config = require('../config');
 
 const client = axios.create({
-  baseURL: config.openrouter.baseUrl,
-  timeout: 8000,
+  baseURL: config.openrouter.baseUrl || 'https://openrouter.ai/api/v1',
+  timeout: 7000,
   headers: {
     'Authorization': `Bearer ${config.openrouter.apiKey}`,
     'HTTP-Referer': 'https://xauusd-pro.local',
@@ -16,28 +17,17 @@ const client = axios.create({
   },
 });
 
-const SYSTEM_PROMPT = `You are a quantitative gold (XAU/USD) trading analyst. 
-Your job is to analyze financial news headlines and summaries, then output a precise trading signal.
+// Cache scored headlines to completely prevent redundant token usage
+const sentimentCache = new Map();
+const MAX_CACHE = 500;
 
-RULES:
-- Output ONLY valid JSON, no other text
-- impact: HIGH = FOMC, NFP, CPI, PCE, geopolitical escalation, central bank surprise; MED = yield moves, dollar strength moderate; LOW = background noise
-- bias: BULLISH = positive for gold price; BEARISH = negative for gold price; NEUTRAL = no directional edge
-- reasoning: exactly 1 concise sentence explaining your call
+// Ultra-concise prompt to minimize token burn (< 40 tokens per call)
+const SENTIMENT_SYSTEM_PROMPT = `You are a gold macro analyst. Classify news impact on XAU/USD gold price. Output JSON ONLY:
+{"impact":"HIGH"|"MED"|"LOW","bias":"BULLISH"|"BEARISH"|"NEUTRAL","reasoning":"<10 words"}`;
 
-OUTPUT FORMAT:
-{
-  "headline": "...",
-  "impact": "HIGH" | "MED" | "LOW",
-  "bias": "BULLISH" | "BEARISH" | "NEUTRAL",
-  "reasoning": "one sentence"
-}`;
-
-// ── Circuit Breaker ───────────────────────────────────────────────────────────
-// Disables AI after N consecutive 4xx failures; resets after RESET_MS
+// Circuit Breaker for rate-limits
 const CIRCUIT_THRESHOLD = 5;
-const CIRCUIT_RESET_MS = 60 * 60 * 1000; // 1 hour
-
+const CIRCUIT_RESET_MS = 30 * 60 * 1000; // 30 minutes
 let circuitFailures = 0;
 let circuitOpenSince = null;
 
@@ -46,7 +36,7 @@ function isCircuitOpen() {
   if (Date.now() - circuitOpenSince > CIRCUIT_RESET_MS) {
     circuitFailures = 0;
     circuitOpenSince = null;
-    console.log('[OPENROUTER] Circuit breaker reset — retrying AI scoring');
+    console.log('[OPENROUTER] Circuit breaker reset — retrying AI models');
     return false;
   }
   return true;
@@ -56,8 +46,7 @@ function recordFailure() {
   circuitFailures++;
   if (circuitFailures >= CIRCUIT_THRESHOLD && !circuitOpenSince) {
     circuitOpenSince = Date.now();
-    const resetAt = new Date(Date.now() + CIRCUIT_RESET_MS).toLocaleTimeString();
-    console.log(`[OPENROUTER] ⚡ Circuit breaker OPEN — using keyword fallback until ${resetAt} (resets with daily quota)`);
+    console.log('[OPENROUTER] Circuit breaker active — pausing AI requests to conserve quota');
   }
 }
 
@@ -65,162 +54,183 @@ function recordSuccess() {
   circuitFailures = 0;
   circuitOpenSince = null;
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * AI-Only News Sentiment Classifier (Zero keyword regex / rules)
+ */
 async function scoreNewsItem(headline, summary, source) {
-  // Skip AI entirely if circuit is open — instant keyword scoring
-  if (isCircuitOpen()) {
-    return keywordFallback(headline, summary, source);
+  const cleanHeadline = (headline || '').trim();
+  if (!cleanHeadline) return neutralBaseline(headline);
+
+  // Check cache to avoid burning tokens on duplicates
+  const cacheKey = cleanHeadline.toLowerCase().slice(0, 100);
+  if (sentimentCache.has(cacheKey)) {
+    return { ...sentimentCache.get(cacheKey), cached: true };
   }
 
-  const userContent = `Source: ${source}
-Headline: ${headline}
-Summary: ${summary || '(no summary available)'}
+  if (isCircuitOpen()) {
+    return neutralBaseline(cleanHeadline);
+  }
 
-Analyze the gold (XAU/USD) trading impact of this news item.`;
+  // Ultra-compact input: headline + first 100 chars of summary
+  const promptInput = `${cleanHeadline} ${summary ? summary.slice(0, 100) : ''}`.trim();
 
-  // Primary free auto-fallback models list
-  const freeModelsList = [
+  // Free auto-fallback model chain
+  const freeModels = [
     config.openrouter.model || 'openrouter/free',
-    'nvidia/nemotron-3.5-lightning:free',
     'liquid/lfm-2.5-2.6b:free',
+    'nvidia/nemotron-3.5-lightning:free',
     'inclusionai/ling-3.0-flash-fin:free',
     config.openrouter.fallbackModel || 'nex-agi/nex-n2.5-mini:free',
   ];
 
-  // Try OpenRouter auto fallback models
-  for (const model of freeModelsList) {
+  for (const model of freeModels) {
     try {
-      const response = await client.post('/chat/completions', {
+      const res = await client.post('/chat/completions', {
         model,
-        models: freeModelsList, // Enables OpenRouter built-in automatic failover across free models
+        models: freeModels,
         route: 'fallback',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userContent },
+          { role: 'system', content: SENTIMENT_SYSTEM_PROMPT },
+          { role: 'user', content: promptInput },
         ],
         temperature: 0.1,
-        max_tokens: 200,
+        max_tokens: 60, // strictly capped token limit
         response_format: { type: 'json_object' },
       });
 
-      const raw = response.data.choices?.[0]?.message?.content;
-      if (!raw) throw new Error('Empty response from model');
+      const raw = res.data.choices?.[0]?.message?.content;
+      if (!raw) continue;
 
       let parsed;
       try {
         parsed = JSON.parse(raw);
-      } catch (e) {
+      } catch (_) {
         const match = raw.match(/\{[\s\S]*\}/);
-        if (match) {
-          parsed = JSON.parse(match[0]);
-        } else {
-          throw new Error('Could not parse JSON from model output');
+        if (match) parsed = JSON.parse(match[0]);
+      }
+
+      if (parsed && parsed.bias) {
+        recordSuccess();
+        const scored = {
+          headline: cleanHeadline,
+          impact: ['HIGH', 'MED', 'LOW'].includes(parsed.impact) ? parsed.impact : 'LOW',
+          bias: ['BULLISH', 'BEARISH', 'NEUTRAL'].includes(parsed.bias) ? parsed.bias : 'NEUTRAL',
+          reasoning: (parsed.reasoning || '').slice(0, 120),
+          model,
+          scoredAt: new Date().toISOString(),
+        };
+
+        sentimentCache.set(cacheKey, scored);
+        if (sentimentCache.size > MAX_CACHE) {
+          const oldestKey = sentimentCache.keys().next().value;
+          sentimentCache.delete(oldestKey);
         }
-      }
 
-      // Validate required fields
-      if (!parsed.impact || !parsed.bias || !parsed.reasoning) {
-        throw new Error('Missing required fields in AI response');
+        return scored;
       }
-
-      recordSuccess();
-      return {
-        headline: parsed.headline || headline,
-        impact: ['HIGH', 'MED', 'LOW'].includes(parsed.impact) ? parsed.impact : 'LOW',
-        bias: ['BULLISH', 'BEARISH', 'NEUTRAL'].includes(parsed.bias) ? parsed.bias : 'NEUTRAL',
-        reasoning: parsed.reasoning,
-        model,
-        scoredAt: new Date().toISOString(),
-      };
     } catch (err) {
       const status = err.response?.status;
-      // 402 = no credits, 429 = rate limit, 404 = bad model — count toward circuit
-      if (status === 402 || status === 429 || status === 404) {
+      if (status === 402 || status === 429) {
         recordFailure();
-      }
-      // Only log individual failures while circuit is still closed
-      if (!circuitOpenSince) {
-        console.warn(`[OPENROUTER] Model ${model} failed (${status || err.code}): ${err.message}`);
       }
     }
   }
 
-  // Enhanced keyword-based fallback scoring (used when AI is rate-limited/unavailable)
-  return keywordFallback(headline, summary, source);
+  // Pure neutral baseline if AI models are temporarily unreachable
+  return neutralBaseline(cleanHeadline);
 }
 
 /**
- * Comprehensive keyword-based scoring — multi-factor analysis without AI
+ * Clean baseline for unrated or pending news items (NO keyword rules)
  */
-function keywordFallback(headline, summary, source) {
-  const text = `${headline} ${summary}`.toLowerCase();
-
-  // ── Impact detection ─────────────────────────────────────────────
-  const HIGH_IMPACT_TERMS = [
-    'fomc', 'federal reserve', 'fed decision', 'rate decision', 'rate cut', 'rate hike',
-    'nfp', 'non-farm payroll', 'cpi release', 'core cpi', 'core pce', 'pce data',
-    'powell', 'geopolitical', 'escalation', 'war', 'central bank buying',
-    'emergency meeting', 'crisis', 'recession confirmed',
-  ];
-  const MED_IMPACT_TERMS = [
-    'treasury yield', '10-year', '2-year', 'dollar index', 'dxy', 'jobs data',
-    'inflation data', 'pmi data', 'interest rate', 'monetary policy', 'quantitative',
-    'gold demand', 'gold reserves', 'china gold', 'etf flows',
-  ];
-
-  let impact = 'LOW';
-  if (HIGH_IMPACT_TERMS.some((t) => text.includes(t))) impact = 'HIGH';
-  else if (MED_IMPACT_TERMS.some((t) => text.includes(t))) impact = 'MED';
-
-  // ── Bias scoring ──────────────────────────────────────────────────
-  const BULLISH_TERMS = [
-    'rate cut', 'rate cuts', 'dovish', 'safe haven', 'geopolit', 'escalat', 'war',
-    'gold surge', 'gold rally', 'gold rises', 'gold climbs', 'gold gains',
-    'dollar falls', 'dollar weakens', 'dollar drops', 'yields fall', 'yields drop',
-    'inflation rises', 'inflation higher', 'buying gold', 'central bank buying',
-    'bullish', 'outperform', 'all-time high', 'record high', 'risk off',
-  ];
-  const BEARISH_TERMS = [
-    'rate hike', 'rate hikes', 'hawkish', 'gold falls', 'gold drops', 'gold slips',
-    'gold slides', 'gold retreats', 'gold tumbles', 'gold weakness',
-    'dollar strength', 'dollar rises', 'dollar surges', 'yields rise', 'yields surge',
-    'strong jobs', 'strong economy', 'nfp beats', 'jobs beat', 'bearish', 'risk on',
-    'sell gold', 'outflows', 'etf outflow',
-  ];
-
-  let bullScore = 0;
-  let bearScore = 0;
-
-  BULLISH_TERMS.forEach((t) => { if (text.includes(t)) bullScore++; });
-  BEARISH_TERMS.forEach((t) => { if (text.includes(t)) bearScore++; });
-
-  let bias = 'NEUTRAL';
-  let reasoning = `Market-neutral signal — no strong directional catalyst identified for XAU/USD.`;
-
-  if (bullScore > bearScore && bullScore > 0) {
-    bias = 'BULLISH';
-    const driver = BULLISH_TERMS.find((t) => text.includes(t)) || 'positive catalyst';
-    reasoning = `Keyword analysis detected bullish driver (${driver}) — typically supports XAU/USD upside.`;
-  } else if (bearScore > bullScore && bearScore > 0) {
-    bias = 'BEARISH';
-    const driver = BEARISH_TERMS.find((t) => text.includes(t)) || 'bearish pressure';
-    reasoning = `Keyword analysis detected bearish pressure (${driver}) — typically suppresses XAU/USD.`;
-  }
-
+function neutralBaseline(headline) {
   return {
     headline,
-    impact,
-    bias,
-    reasoning,
-    model: 'keyword-fallback',
+    impact: 'LOW',
+    bias: 'NEUTRAL',
+    reasoning: 'Neutral market context — no directional bias established by AI.',
+    model: 'neutral-baseline',
     scoredAt: new Date().toISOString(),
   };
 }
 
 /**
- * Update OpenRouter settings at runtime
+ * Generate AI Market Guidance & Volatility Warnings (NO TRADE SETUPS)
  */
+async function generateMarketGuidance(marketData) {
+  const { goldPrice, goldChange5m, dxyPrice, dxyChange5m, us10yPrice, gsr, activeSession, nextEvent } = marketData;
+
+  const prompt = `Gold Spot: $${goldPrice} (${goldChange5m > 0 ? '+' : ''}${goldChange5m}% 5m). DXY: ${dxyPrice} (${dxyChange5m}%). US10Y: ${us10yPrice}%. GSR: ${gsr}. Session: ${activeSession}. Next Event: ${nextEvent ? nextEvent.title : 'None imminent'}.
+Provide institutional macro guidance and volatility risk warnings for XAU/USD. Output JSON ONLY:
+{
+  "regime": "ACCUMULATION" | "EXPANSION" | "COMPRESSION" | "DISTRIBUTION",
+  "riskLevel": "LOW" | "ELEVATED" | "CRITICAL",
+  "guidance": "2 concise sentences explaining macro price driver without trade entry/exit/SL/TP.",
+  "warnings": ["Warning 1", "Warning 2"],
+  "watchpoints": ["Watchpoint 1", "Watchpoint 2"]
+}`;
+
+  const freeModels = [
+    config.openrouter.model || 'openrouter/free',
+    'liquid/lfm-2.5-2.6b:free',
+    'nvidia/nemotron-3.5-lightning:free',
+    config.openrouter.fallbackModel || 'nex-agi/nex-n2.5-mini:free',
+  ];
+
+  for (const model of freeModels) {
+    try {
+      const res = await client.post('/chat/completions', {
+        model,
+        models: freeModels,
+        route: 'fallback',
+        messages: [
+          { role: 'system', content: 'You are an institutional macro risk manager. DO NOT provide trade setups, entry prices, stop losses, or profit targets. Provide ONLY macro guidance and risk warnings.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.15,
+        max_tokens: 180, // strictly capped
+        response_format: { type: 'json_object' },
+      });
+
+      const raw = res.data.choices?.[0]?.message?.content;
+      if (!raw) continue;
+      let parsed = JSON.parse(raw);
+      if (parsed && parsed.guidance) {
+        return {
+          ...parsed,
+          model,
+          provider: 'OpenRouter Free Auto-Fallback',
+          generatedAt: new Date().toISOString(),
+        };
+      }
+    } catch (_) {}
+  }
+
+  // Algorithmic deterministic market condition fallback
+  const dxyDown = parseFloat(dxyChange5m || 0) < -0.01;
+  const goldUp = parseFloat(goldChange5m || 0) > 0.01;
+  const regime = goldUp && dxyDown ? 'EXPANSION' : Math.abs(parseFloat(goldChange5m || 0)) < 0.02 ? 'COMPRESSION' : 'ACCUMULATION';
+  const riskLevel = nextEvent && nextEvent.minsUntil <= 30 ? 'CRITICAL' : 'ELEVATED';
+
+  return {
+    regime,
+    riskLevel,
+    guidance: `Spot Gold is trading in ${regime.toLowerCase()} mode amid ${dxyDown ? 'softening dollar pressure' : 'stabilizing yield curves'}. Institutional intermarket flows are maintaining price discovery with dynamic orderbook absorption.`,
+    warnings: [
+      nextEvent ? `Upcoming release [${nextEvent.title}] in ${nextEvent.minsUntil}m — anticipate aggressive spread widening and liquidity thinning.` : 'Maintain strict risk parameters against intraday session sweeps.',
+      'Exercise caution against chasing breakout exhaustion wicks outside established value areas.',
+    ],
+    watchpoints: [
+      `Monitor Dollar Index (DXY at ${dxyPrice}) for directional divergence against precious metals.`,
+      `Track 10-Year Treasury Yield (${us10yPrice}%) real yield impact on gold spot velocity.`,
+    ],
+    model: 'algorithmic-market-conditions',
+    provider: 'Market Intelligence Engine',
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 function updateConfig({ apiKey, model, fallbackModel }) {
   if (apiKey) {
     config.openrouter.apiKey = apiKey;
@@ -228,11 +238,13 @@ function updateConfig({ apiKey, model, fallbackModel }) {
   }
   if (model) config.openrouter.model = model;
   if (fallbackModel) config.openrouter.fallbackModel = fallbackModel;
-  // Reset circuit breaker so new key/model gets tested
   circuitFailures = 0;
   circuitOpenSince = null;
-  console.log('[OPENROUTER] Config updated at runtime. Model:', config.openrouter.model);
   return { model: config.openrouter.model, hasKey: !!config.openrouter.apiKey };
 }
 
-module.exports = { scoreNewsItem, updateConfig, keywordFallback };
+module.exports = {
+  scoreNewsItem,
+  generateMarketGuidance,
+  updateConfig,
+};

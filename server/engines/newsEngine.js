@@ -6,7 +6,6 @@ const Parser = require('rss-parser');
 const config = require('../config');
 const { isGoldRelevant, relevanceScore } = require('../utils/goldFilter');
 const aiOrchestrator = require('../utils/aiOrchestrator');
-const { keywordFallback } = require('../utils/openrouter');
 const telegramEngine = require('./telegramEngine');
 
 const parser = new Parser({
@@ -51,14 +50,12 @@ async function fetchFeed(feed) {
       publishedAt: item.pubDate || item.isoDate || new Date().toISOString(),
     }));
   } catch (err) {
-    // Non-fatal warning — other feeds continue with zero disruption
-    // console.warn(`[NEWS] ${feed.name}: ${err.message}`);
     return [];
   }
 }
 
 /**
- * Process a single news item with instant 0ms broadcast
+ * Process a single news item with instant 0ms broadcast & AI model evaluation
  */
 function processItemInstantly(rawItem) {
   if (!rawItem.title) return null;
@@ -80,19 +77,19 @@ function processItemInstantly(rawItem) {
 
   const score = relevanceScore(rawItem.title, rawItem.summary);
 
-  // 1. FAST ZERO-DELAY HEURISTIC SCORING (< 0.1ms)
-  // Guarantees immediate delivery with zero external network waiting
-  const instantSentiment = keywordFallback(rawItem.title, rawItem.summary, rawItem.source);
-
+  // 1. INSTANT NEUTRAL BASELINE (NO HARDCODED KEYWORD RULES LIKE 'WAR')
   const newsItem = {
     id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
     ...rawItem,
-    ...instantSentiment,
+    impact: 'LOW',
+    bias: 'NEUTRAL',
+    reasoning: 'Evaluating via AI sentiment model...',
+    model: 'evaluating-ai',
     relevanceScore: score,
     processedAt: new Date().toISOString(),
   };
 
-  // 2. BROADCAST IMMEDIATELY TO WEBSOCKET CLIENTS
+  // 2. BROADCAST IMMEDIATELY TO WEBSOCKET CLIENTS (ZERO LATENCY)
   if (io) {
     io.emit('news_item', newsItem);
   }
@@ -101,31 +98,30 @@ function processItemInstantly(rawItem) {
   latestNews.unshift(newsItem);
   if (latestNews.length > MAX_NEWS) latestNews = latestNews.slice(0, MAX_NEWS);
 
-  // 3. TRIGGER INSTANT TELEGRAM NOTIFICATION FOR HIGH IMPACT
-  if (newsItem.impact === 'HIGH') {
-    telegramEngine.sendNewsAlert(newsItem).catch((err) =>
-      console.error('[NEWS] Telegram alert error:', err.message)
-    );
-  }
-
-  // 4. ASYNCHRONOUS BACKGROUND AI REFINEMENT (FIRE & FORGET)
-  // Priority: Google Gemini -> OpenRouter Fallback -> Quant Heuristic
+  // 3. ASYNCHRONOUS PURE AI MODEL EVALUATION (OpenRouter Free Models & Gemini)
   aiOrchestrator.scoreNewsItem(rawItem.title, rawItem.summary, rawItem.source)
     .then((aiSentiment) => {
-      if (aiSentiment && aiSentiment.reasoning) {
+      if (aiSentiment && aiSentiment.bias) {
         newsItem.reasoning = aiSentiment.reasoning || newsItem.reasoning;
         newsItem.impact = aiSentiment.impact || newsItem.impact;
         newsItem.bias = aiSentiment.bias || newsItem.bias;
         newsItem.model = aiSentiment.model;
         newsItem.provider = aiSentiment.provider;
+
+        // Broadcast updated sentiment dynamically to update market bias
         if (io) {
           io.emit('news_item_update', newsItem);
         }
+
+        // High-impact alert trigger
+        if (newsItem.impact === 'HIGH') {
+          telegramEngine.sendNewsAlert(newsItem).catch((err) =>
+            console.error('[NEWS] Telegram alert error:', err.message)
+          );
+        }
       }
     })
-    .catch(() => {
-      // Keep instant keyword fallback silently
-    });
+    .catch(() => {});
 
   return newsItem;
 }

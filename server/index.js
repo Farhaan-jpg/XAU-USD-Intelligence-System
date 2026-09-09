@@ -73,6 +73,45 @@ app.get('/api/ai/models', (req, res) => {
   res.json(aiOrchestrator.getSystemTelemetry());
 });
 
+app.post('/api/ai/guidance', async (req, res) => {
+  try {
+    const prices = priceEngine.getLatest();
+    const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+    const dxy = prices['DX-Y.NYB'] || {};
+    const us10y = prices['^TNX'] || {};
+    const silver = prices['SI=F'] || prices['XAGUSD'] || {};
+    const recentNews = newsEngine.getLatest().slice(0, 5).map((n) => n.headline || n.title);
+    const calendarData = calendarEngine.getData();
+    const nextEvent = (calendarData?.upcomingEvents || []).find((e) => e.impact === 'HIGH');
+
+    const goldPrice = parseFloat(gold.price || 4400);
+    const silverPrice = parseFloat(silver.price || 66);
+    const gsr = silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '66.0';
+
+    const marketData = {
+      goldPrice: goldPrice.toFixed(2),
+      goldChange5m: gold.change5m || 0,
+      dxyPrice: dxy.price || '105.20',
+      dxyChange5m: dxy.change5m || 0,
+      us10yPrice: us10y.price || '4.35',
+      silverPrice: silverPrice.toFixed(2),
+      gsr,
+      activeSession: req.body?.activeSession || 'London/NY Overlap',
+      recentHeadlines: recentNews,
+      nextEvent: nextEvent ? {
+        title: nextEvent.title,
+        minsUntil: Math.round((new Date(nextEvent.date || nextEvent.timeUTC).getTime() - Date.now()) / 60000),
+      } : null,
+    };
+
+    const guidance = await aiOrchestrator.getMarketGuidance(marketData);
+    res.json({ success: true, guidance, marketData });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Alias for backward compatibility
 app.post('/api/ai/copilot', async (req, res) => {
   try {
     const prices = priceEngine.getLatest();
@@ -100,12 +139,12 @@ app.post('/api/ai/copilot', async (req, res) => {
       recentHeadlines: recentNews,
       nextEvent: nextEvent ? {
         title: nextEvent.title,
-        minsUntil: Math.round((new Date(nextEvent.timeUTC).getTime() - Date.now()) / 60000),
+        minsUntil: Math.round((new Date(nextEvent.date || nextEvent.timeUTC).getTime() - Date.now()) / 60000),
       } : null,
     };
 
-    const copilot = await aiOrchestrator.getTradeCopilot(marketData);
-    res.json({ success: true, copilot, marketData });
+    const guidance = await aiOrchestrator.getMarketGuidance(marketData);
+    res.json({ success: true, guidance, copilot: guidance, marketData });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

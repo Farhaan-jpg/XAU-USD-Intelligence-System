@@ -800,56 +800,138 @@ body {
   border-color: var(--border-gold);
 }
 
-/* AI Copilot & Scenario Playbook */
-.copilot-grid {
+/* AI Institutional Market Guidance & Volatility Protocol */
+.guidance-content-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  gap: 16px;
+  gap: 14px;
 }
 
 @media (max-width: 900px) {
-  .copilot-grid {
+  .guidance-content-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* CFTC Commitment of Traders (COT) & Retail Grid */
+.cot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .cot-grid {
     grid-template-columns: 1fr;
   }
 }
 
-.copilot-setup-card {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(15, 23, 38, 0.9));
-  border: 1px solid var(--border-gold);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.setup-levels-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.setup-level-box {
+.cot-box {
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  transition: all 0.15s ease;
 }
 
-.setup-level-label {
+.cot-box:hover {
+  border-color: var(--border-medium);
+  background: var(--bg-panel-hover);
+}
+
+.cot-label {
   font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
   color: var(--text-dim);
+  letter-spacing: 0.5px;
 }
 
-.setup-level-val {
-  font-size: 14px;
-  font-weight: 700;
+.cot-value {
+  font-size: 18px;
+  font-weight: 800;
   font-family: var(--font-mono);
-  color: #fff;
+}
+
+.cot-bar-container {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.cot-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.cot-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Smart Liquidity & Order Block (SMC) Grid */
+.liquidity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  .liquidity-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.liquidity-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.liquidity-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.liquidity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.liquidity-row:last-child {
+  border-bottom: none;
+}
+
+.liquidity-label {
+  color: var(--text-muted);
+}
+
+.liquidity-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
 }
 
 /* Global Session Clock */
@@ -1351,13 +1433,9 @@ body {
     font-size: 11px;
   }
 
-  .copilot-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .setup-levels-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
+  .guidance-content-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
   }
 
   .calc-inputs-grid {
@@ -1384,10 +1462,6 @@ body {
 }
 
 @media (max-width: 480px) {
-  .setup-levels-grid {
-    grid-template-columns: 1fr;
-  }
-
   .interactive-chart-box {
     height: 340px !important;
   }
