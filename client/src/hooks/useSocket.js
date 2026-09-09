@@ -42,6 +42,22 @@ export function useSocket() {
   useEffect(() => {
     const socket = getSocket();
 
+    // Immediate initial fetch to ensure zero startup delay
+    const fetchLatestPrices = () => {
+      fetch('/api/prices')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && Object.keys(data).length > 0) {
+            setPrices((prev) => ({ ...data, ...prev }));
+          }
+        })
+        .catch(() => {});
+    };
+    fetchLatestPrices();
+
+    // Backup polling every 2.5s if socket connection is pending or recovering
+    const backupPollInterval = setInterval(fetchLatestPrices, 2500);
+
     const onConnect = () => {
       setConnected(true);
       measureLatency(socket);
@@ -56,7 +72,9 @@ export function useSocket() {
     };
 
     const onPriceUpdate = (data) => {
-      setPrices(data.prices || {});
+      if (data?.prices) {
+        setPrices((prev) => ({ ...prev, ...data.prices }));
+      }
     };
 
     const onNewsItem = (item) => {
@@ -128,6 +146,7 @@ export function useSocket() {
       socket.off('news_batch', onNewsBatch);
       socket.off('calendar_update', onCalendarUpdate);
       if (pingTimerRef.current) clearInterval(pingTimerRef.current);
+      clearInterval(backupPollInterval);
     };
   }, [measureLatency]);
 

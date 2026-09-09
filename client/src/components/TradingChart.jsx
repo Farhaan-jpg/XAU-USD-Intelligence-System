@@ -1,14 +1,29 @@
 // client/src/components/TradingChart.jsx
 // Professional TradingView Live Workstation for XAU/USD Spot Gold
 
-import { useState, useMemo } from 'react';
-import { Layers, Maximize2, ExternalLink, ShieldAlert } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Layers, Maximize2, ExternalLink, ShieldAlert, Radio } from 'lucide-react';
 
 export default function TradingChart({ prices = {} }) {
   const [interval, setInterval] = useState('5'); // '1', '5', '15', '60', '240', 'D'
 
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
+
+  // Dynamic tick direction flash
+  const [tickDirection, setTickDirection] = useState(null);
+  const prevPriceRef = useRef(spotPrice);
+
+  useEffect(() => {
+    if (spotPrice && prevPriceRef.current && spotPrice !== prevPriceRef.current) {
+      const dir = spotPrice > prevPriceRef.current ? 'up' : 'down';
+      setTickDirection(dir);
+      const timer = setTimeout(() => setTickDirection(null), 400);
+      prevPriceRef.current = spotPrice;
+      return () => clearTimeout(timer);
+    }
+    if (spotPrice) prevPriceRef.current = spotPrice;
+  }, [spotPrice]);
 
   // Institutional floor pivots based on authentic spot range
   const pivots = useMemo(() => {
@@ -54,17 +69,29 @@ export default function TradingChart({ prices = {} }) {
   // TradingView embed URL with custom interval and dark theme
   const tvSrc = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=OANDA%3AXAUUSD&interval=${interval}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0a0f18&studies=%5B%22MASimple%40tv-basicstudies%22%2C%22RSI%40tv-basicstudies%22%5D&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%22paneProperties.background%22%3A%22%23090e17%22%2C%22paneProperties.vertGridProperties.color%22%3A%22rgba(255%2C255%2C255%2C0.03)%22%2C%22paneProperties.horzGridProperties.color%22%3A%22rgba(255%2C255%2C0.03)%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&utm_source=localhost`;
 
+  const bid = gold.bid ? parseFloat(gold.bid).toFixed(2) : null;
+  const ask = gold.ask ? parseFloat(gold.ask).toFixed(2) : null;
+  const spread = (bid && ask && parseFloat(ask) >= parseFloat(bid)) ? (parseFloat(ask) - parseFloat(bid)).toFixed(2) : null;
+
   return (
     <div className="panel-card" style={{ padding: '16px' }}>
       {/* Chart Top Header & Level Bar */}
       <div className="chart-header-stats">
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              LIVE SPOT GOLD &bull; OANDA:XAUUSD
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                LIVE SPOT GOLD &bull; OANDA:XAUUSD
+              </span>
+              <span className="live-tick-pulse" title="Real-time WebSocket Streaming Active">
+                <span className="live-tick-dot"></span>
+                <span>STREAMING</span>
+              </span>
             </div>
             <div className="spot-price-big">
-              <span>${spotPrice > 0 ? spotPrice.toFixed(2) : '--'}</span>
+              <span className={`spot-price-value ${tickDirection === 'up' ? 'tick-flash-up' : tickDirection === 'down' ? 'tick-flash-down' : ''}`}>
+                ${spotPrice > 0 ? spotPrice.toFixed(2) : '--'}
+              </span>
               <span
                 className="spot-price-change"
                 style={{ color: parseFloat(gold.changeDay || gold.change5m || 0) >= 0 ? 'var(--bull-glow)' : 'var(--bear-glow)' }}
@@ -73,6 +100,12 @@ export default function TradingChart({ prices = {} }) {
                 {gold.changeDay !== undefined ? `${parseFloat(gold.changeDay) >= 0 ? '+' : ''}${gold.changeDay}%` : `${parseFloat(gold.change5m || 0) >= 0 ? '+' : ''}${gold.change5m || 0}%`}
               </span>
             </div>
+            {bid && ask && (
+              <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+                BID <strong style={{ color: '#fff' }}>${bid}</strong> &bull; ASK <strong style={{ color: '#fff' }}>${ask}</strong>
+                {spread && <span style={{ marginLeft: '6px', color: 'var(--text-muted)' }}>(Spread ${spread})</span>}
+              </div>
+            )}
           </div>
 
           {/* Institutional Timeframe Selector */}

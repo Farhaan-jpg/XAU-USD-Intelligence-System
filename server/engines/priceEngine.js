@@ -1,7 +1,9 @@
 // server/engines/priceEngine.js
-// High-Frequency Real-Time Price Streaming Engine for XAU/USD & Correlated Assets
-// Prioritizes authentic OANDA:XAUUSD Spot Gold & TVC:SILVER Spot with multi-tier failover
+// Sub-Second Real-Time Price Streaming Engine for XAU/USD & Correlated Assets
+// Connects directly to TradingView's live quote WebSocket for OANDA:XAUUSD & TVC:SILVER
+// with seamless multi-tier HTTP fallback (GoldAPI, Binance PAXG, Yahoo Finance)
 
+const WebSocket = require('ws');
 const axios = require('axios');
 const YahooFinanceClass = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
@@ -26,20 +28,222 @@ let io = null;
 let pollTimer = null;
 let latestPrices = {};
 let isRunning = false;
+let tvStreamer = null;
+let lastWsTickTime = 0;
+let broadcastThrottleTimer = null;
 
 function init(socketIo) {
   io = socketIo;
 }
 
 /**
- * Fetch real-time institutional Spot Gold (XAU/USD) with multi-tier failover
- * Level 1: TradingView OANDA:XAUUSD scanner (exact feed matching the workstation chart)
- * Level 2: TradingView TVC:GOLD scanner
- * Level 3: Gold-API.com live spot
- * Level 4: Binance PAXGUSDT spot proxy
+ * Throttle socket broadcast to max 4 times per second to keep frontend ultra-responsive
+ * without swamping the browser React render loop
+ */
+function scheduleBroadcast() {
+  if (broadcastThrottleTimer) return;
+  broadcastThrottleTimer = setTimeout(() => {
+    broadcastThrottleTimer = null;
+    if (io) {
+      io.emit('price_update', {
+        prices: latestPrices,
+        serverTime: new Date().toISOString(),
+      });
+    }
+  }, 250);
+}
+
+/**
+ * Real-Time TradingView WebSocket Streamer
+ * Connects directly to TradingView's quote session for OANDA:XAUUSD and TVC:SILVER
+ * Provides sub-second live ticks matching the workstation chart
+ */
+class TVStreamer {
+  constructor(symbols) {
+    this.symbols = symbols;
+    this.ws = null;
+    this.sessionId = 'qs_' + Math.random().toString(36).substring(2, 10);
+    this.reconnectTimer = null;
+    this.isClosed = false;
+    this.connect();
+  }
+
+  send(m, p) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const msg = JSON.stringify({ m, p });
+      this.ws.send(`~m~${msg.length}~m~${msg}`);
+    }
+  }
+
+  connect() {
+    if (this.isClosed) return;
+    try {
+      this.ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket', {
+        headers: {
+          'Origin': 'https://s.tradingview.com',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      });
+
+      this.ws.on('open', () => {
+        console.log('[TV-STREAM] Connected to live TradingView quote stream');
+        this.send('set_auth_token', ['unauthorized_user_token']);
+        this.send('quote_create_session', [this.sessionId]);
+        this.send('quote_set_fields', [
+          this.sessionId,
+          'lp', 'bid', 'ask', 'ch', 'chp', 'high_price', 'low_price', 'open_price', 'volume'
+        ]);
+        this.send('quote_add_symbols', [this.sessionId, ...this.symbols]);
+      });
+
+      this.ws.on('message', (data) => {
+        const raw = data.toString();
+        const chunks = raw.split(/~m~\d+~m~/).filter(Boolean);
+        for (const chunk of chunks) {
+          if (chunk.startsWith('~h~')) {
+            this.send('~m~' + chunk.length + '~m~' + chunk); // heartbeat reply
+            continue;
+          }
+          try {
+            const parsed = JSON.parse(chunk);
+            if (parsed.m === 'qsd' && parsed.p && parsed.p[1]) {
+              const sym = parsed.p[1].n;
+              const v = parsed.p[1].v;
+              this.handleTick(sym, v);
+            }
+          } catch (_) {}
+        }
+      });
+
+      this.ws.on('close', () => {
+        if (!this.isClosed) {
+          console.log('[TV-STREAM] Stream closed, reconnecting in 2s...');
+          this.reconnectTimer = setTimeout(() => this.connect(), 2000);
+        }
+      });
+
+      this.ws.on('error', (err) => {
+        console.warn('[TV-STREAM] WebSocket notice:', err.message);
+      });
+    } catch (err) {
+      console.error('[TV-STREAM] Connection setup error:', err.message);
+      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+    }
+  }
+
+  handleTick(sym, v) {
+    if (!v) return;
+    lastWsTickTime = Date.now();
+
+    const isGold = sym.includes('XAUUSD');
+    const isSilver = sym.includes('SILVER') || sym.includes('XAGUSD');
+
+    if (isGold) {
+      const existing = latestPrices['GC=F'] || {};
+      const newPrice = v.lp ? parseFloat(v.lp.toFixed(2)) : (v.bid && v.ask ? parseFloat(((v.bid + v.ask) / 2).toFixed(2)) : (v.bid ? parseFloat(v.bid.toFixed(2)) : existing.price));
+      if (!newPrice) return;
+
+      const bid = v.bid ? parseFloat(v.bid.toFixed(2)) : (existing.bid || newPrice);
+      const ask = v.ask ? parseFloat(v.ask.toFixed(2)) : (existing.ask || newPrice);
+      const high = v.high_price ? parseFloat(v.high_price.toFixed(2)) : (existing.high ? Math.max(existing.high, newPrice) : newPrice);
+      const low = v.low_price ? parseFloat(v.low_price.toFixed(2)) : (existing.low ? Math.min(existing.low, newPrice) : newPrice);
+      const open = v.open_price ? parseFloat(v.open_price.toFixed(2)) : (existing.open || newPrice);
+      const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
+      const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(2)) : (existing.changeAbs || 0);
+
+      // Buffer
+      if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
+      priceHistory['GC=F'].push({ price: newPrice, ts: Date.now() });
+      if (priceHistory['GC=F'].length > BUFFER_SIZE) priceHistory['GC=F'].shift();
+      const oldest = priceHistory['GC=F'][0]?.price;
+      const change5m = oldest ? ((newPrice - oldest) / oldest) * 100 : 0;
+
+      const goldData = {
+        symbol: 'GC=F',
+        label: 'XAU/USD',
+        description: 'Spot Gold (OANDA:XAUUSD)',
+        unit: 'USD/oz',
+        correlation: 'primary',
+        price: newPrice,
+        change5m: parseFloat(change5m.toFixed(4)),
+        changeDay: chp,
+        changeAbs: ch,
+        bid,
+        ask,
+        high,
+        low,
+        open,
+        volume: v.volume || existing.volume || 0,
+        direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
+        updatedAt: new Date().toISOString(),
+        latency: 'REALTIME_WEBSOCKET',
+        source: 'OANDA:XAUUSD_STREAM',
+      };
+
+      latestPrices['GC=F'] = goldData;
+      latestPrices['XAUUSD'] = goldData;
+      scheduleBroadcast();
+    } else if (isSilver) {
+      const existing = latestPrices['SI=F'] || {};
+      const newPrice = v.lp ? parseFloat(v.lp.toFixed(2)) : (v.bid && v.ask ? parseFloat(((v.bid + v.ask) / 2).toFixed(2)) : (v.bid ? parseFloat(v.bid.toFixed(2)) : existing.price));
+      if (!newPrice) return;
+
+      const bid = v.bid ? parseFloat(v.bid.toFixed(2)) : (existing.bid || newPrice);
+      const ask = v.ask ? parseFloat(v.ask.toFixed(2)) : (existing.ask || newPrice);
+      const high = v.high_price ? parseFloat(v.high_price.toFixed(2)) : (existing.high ? Math.max(existing.high, newPrice) : newPrice);
+      const low = v.low_price ? parseFloat(v.low_price.toFixed(2)) : (existing.low ? Math.min(existing.low, newPrice) : newPrice);
+      const open = v.open_price ? parseFloat(v.open_price.toFixed(2)) : (existing.open || newPrice);
+      const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
+      const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(2)) : (existing.changeAbs || 0);
+
+      if (!priceHistory['SI=F']) priceHistory['SI=F'] = [];
+      priceHistory['SI=F'].push({ price: newPrice, ts: Date.now() });
+      if (priceHistory['SI=F'].length > BUFFER_SIZE) priceHistory['SI=F'].shift();
+      const oldest = priceHistory['SI=F'][0]?.price;
+      const change5m = oldest ? ((newPrice - oldest) / oldest) * 100 : 0;
+
+      const silverData = {
+        symbol: 'SI=F',
+        label: 'XAG/USD',
+        description: 'Spot Silver (TVC:SILVER)',
+        unit: 'USD/oz',
+        correlation: 'direct',
+        price: newPrice,
+        change5m: parseFloat(change5m.toFixed(4)),
+        changeDay: chp,
+        changeAbs: ch,
+        bid,
+        ask,
+        high,
+        low,
+        open,
+        volume: v.volume || existing.volume || 0,
+        direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
+        updatedAt: new Date().toISOString(),
+        latency: 'REALTIME_WEBSOCKET',
+        source: 'TVC:SILVER_STREAM',
+      };
+
+      latestPrices['SI=F'] = silverData;
+      latestPrices['XAGUSD'] = silverData;
+      scheduleBroadcast();
+    }
+  }
+
+  stop() {
+    this.isClosed = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.ws) {
+      try { this.ws.close(); } catch (_) {}
+    }
+  }
+}
+
+/**
+ * HTTP Fallback Spot Gold Fetcher
  */
 async function fetchLiveGoldSpot() {
-  // Tier 1: TradingView OANDA:XAUUSD scanner (direct match with TradingView chart)
+  // Tier 1: TradingView OANDA scanner
   try {
     const res = await axios.get('https://scanner.tradingview.com/symbol?symbol=OANDA:XAUUSD&fields=close,change,change_abs,open,high,low,volume,bid,ask', {
       headers: {
@@ -64,42 +268,12 @@ async function fetchLiveGoldSpot() {
         changeDay: typeof d.change === 'number' ? parseFloat(d.change.toFixed(2)) : 0,
         changeAbs: typeof d.change_abs === 'number' ? parseFloat(d.change_abs.toFixed(2)) : 0,
         volume: d.volume || 0,
-        source: 'OANDA:XAUUSD',
+        source: 'OANDA:XAUUSD_SCANNER',
       };
     }
   } catch (_) {}
 
-  // Tier 2: TradingView TVC:GOLD scanner
-  try {
-    const res = await axios.get('https://scanner.tradingview.com/symbol?symbol=TVC:GOLD&fields=close,change,change_abs,open,high,low,volume,bid,ask', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Origin': 'https://www.tradingview.com',
-        'Referer': 'https://www.tradingview.com/'
-      },
-      timeout: 2500,
-    });
-    const d = res.data;
-    if (d && (d.bid || d.close)) {
-      const bid = d.bid || d.close;
-      const ask = d.ask || d.close;
-      const price = (d.bid && d.ask) ? (d.bid + d.ask) / 2 : (d.close || d.bid);
-      return {
-        price: parseFloat(price.toFixed(2)),
-        bid: parseFloat(bid.toFixed(2)),
-        ask: parseFloat(ask.toFixed(2)),
-        high: parseFloat((d.high || price).toFixed(2)),
-        low: parseFloat((d.low || price).toFixed(2)),
-        open: parseFloat((d.open || price).toFixed(2)),
-        changeDay: typeof d.change === 'number' ? parseFloat(d.change.toFixed(2)) : 0,
-        changeAbs: typeof d.change_abs === 'number' ? parseFloat(d.change_abs.toFixed(2)) : 0,
-        volume: d.volume || 0,
-        source: 'TVC:GOLD',
-      };
-    }
-  } catch (_) {}
-
-  // Tier 3: Gold-API.com live spot
+  // Tier 2: Gold-API.com live spot
   try {
     const res = await axios.get('https://api.gold-api.com/price/XAU', { timeout: 2500 });
     if (res.data?.price) {
@@ -119,7 +293,7 @@ async function fetchLiveGoldSpot() {
     }
   } catch (_) {}
 
-  // Tier 4: Binance PAXGUSDT spot proxy
+  // Tier 3: Binance PAXGUSDT spot proxy
   try {
     const res = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT', { timeout: 2000 });
     if (res.data?.price) {
@@ -143,12 +317,9 @@ async function fetchLiveGoldSpot() {
 }
 
 /**
- * Fetch real-time institutional Spot Silver (XAG/USD) with multi-tier failover
- * Level 1: TradingView TVC:SILVER scanner
- * Level 2: Gold-API.com live spot silver
+ * HTTP Fallback Spot Silver Fetcher
  */
 async function fetchLiveSilverSpot() {
-  // Tier 1: TradingView TVC:SILVER
   try {
     const res = await axios.get('https://scanner.tradingview.com/symbol?symbol=TVC:SILVER&fields=close,change,change_abs,open,high,low,volume,bid,ask', {
       headers: {
@@ -173,12 +344,11 @@ async function fetchLiveSilverSpot() {
         changeDay: typeof d.change === 'number' ? parseFloat(d.change.toFixed(2)) : 0,
         changeAbs: typeof d.change_abs === 'number' ? parseFloat(d.change_abs.toFixed(2)) : 0,
         volume: d.volume || 0,
-        source: 'TVC:SILVER',
+        source: 'TVC:SILVER_SCANNER',
       };
     }
   } catch (_) {}
 
-  // Tier 2: Gold-API.com live spot silver
   try {
     const res = await axios.get('https://api.gold-api.com/price/XAG', { timeout: 2500 });
     if (res.data?.price) {
@@ -202,106 +372,93 @@ async function fetchLiveSilverSpot() {
 }
 
 /**
- * Fetch all correlated instruments in parallel
+ * Periodic macro polling & fallback aggregator
  */
 async function fetchAllPrices() {
   const macroSymbols = ['DX-Y.NYB', '^TNX', '^IRX', 'JPY=X', 'CL=F'];
   const results = {};
 
-  // Fetch real-time spot gold, spot silver, and Yahoo Finance macro quotes simultaneously
-  const [goldSpotRes, silverSpotRes, ...yahooQuotes] = await Promise.allSettled([
-    fetchLiveGoldSpot(),
-    fetchLiveSilverSpot(),
+  const wsActive = Date.now() - lastWsTickTime < 10000;
+
+  // If WebSocket is active, only fetch macro quotes from Yahoo Finance
+  const promises = [
+    wsActive ? Promise.resolve(null) : fetchLiveGoldSpot(),
+    wsActive ? Promise.resolve(null) : fetchLiveSilverSpot(),
     ...macroSymbols.map((sym) => yahooFinance.quote(sym)),
-  ]);
+  ];
 
-  const liveGold = goldSpotRes.status === 'fulfilled' ? goldSpotRes.value : null;
-  const liveSilver = silverSpotRes.status === 'fulfilled' ? silverSpotRes.value : null;
+  const [goldSpotRes, silverSpotRes, ...yahooQuotes] = await Promise.allSettled(promises);
 
-  // Process Spot Gold (GC=F key for backward compatibility, plus XAUUSD alias)
-  let goldPrice = liveGold?.price || latestPrices['GC=F']?.price || 0;
-  if (goldPrice <= 0) {
-    try {
-      const fallbackQuote = await yahooFinance.quote('GC=F');
-      goldPrice = fallbackQuote?.regularMarketPrice || 0;
-    } catch (_) {}
-  }
+  // If WebSocket was inactive, apply HTTP spot fallback
+  if (!wsActive) {
+    const liveGold = goldSpotRes.status === 'fulfilled' ? goldSpotRes.value : null;
+    const liveSilver = silverSpotRes.status === 'fulfilled' ? silverSpotRes.value : null;
 
-  if (goldPrice > 0) {
-    if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
-    priceHistory['GC=F'].push({ price: goldPrice, ts: Date.now() });
-    if (priceHistory['GC=F'].length > BUFFER_SIZE) priceHistory['GC=F'].shift();
+    if (liveGold?.price) {
+      const goldPrice = liveGold.price;
+      if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
+      priceHistory['GC=F'].push({ price: goldPrice, ts: Date.now() });
+      if (priceHistory['GC=F'].length > BUFFER_SIZE) priceHistory['GC=F'].shift();
+      const oldest = priceHistory['GC=F'][0]?.price;
+      const change5m = oldest ? ((goldPrice - oldest) / oldest) * 100 : 0;
 
-    const buf = priceHistory['GC=F'];
-    const oldest = buf[0]?.price;
-    const change5m = oldest ? ((goldPrice - oldest) / oldest) * 100 : 0;
+      const goldData = {
+        symbol: 'GC=F',
+        label: 'XAU/USD',
+        description: 'Spot Gold (OANDA:XAUUSD)',
+        unit: 'USD/oz',
+        correlation: 'primary',
+        price: goldPrice,
+        change5m: parseFloat(change5m.toFixed(4)),
+        changeDay: liveGold.changeDay || (latestPrices['GC=F']?.changeDay || 0),
+        changeAbs: liveGold.changeAbs || 0,
+        bid: liveGold.bid || goldPrice,
+        ask: liveGold.ask || goldPrice,
+        high: liveGold.high || goldPrice,
+        low: liveGold.low || goldPrice,
+        open: liveGold.open || goldPrice,
+        volume: liveGold.volume || 0,
+        direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
+        updatedAt: new Date().toISOString(),
+        latency: 'REALTIME_HTTP',
+        source: liveGold.source || 'HTTP_FALLBACK',
+      };
+      results['GC=F'] = goldData;
+      results['XAUUSD'] = goldData;
+    }
 
-    const goldData = {
-      symbol: 'GC=F',
-      label: 'XAU/USD',
-      description: liveGold?.source ? `Spot Gold (${liveGold.source})` : 'Gold Spot',
-      unit: 'USD/oz',
-      correlation: 'primary',
-      price: goldPrice,
-      change5m: parseFloat(change5m.toFixed(4)),
-      changeDay: liveGold?.changeDay !== undefined ? liveGold.changeDay : (latestPrices['GC=F']?.changeDay || 0),
-      changeAbs: liveGold?.changeAbs || 0,
-      bid: liveGold?.bid || goldPrice,
-      ask: liveGold?.ask || goldPrice,
-      high: liveGold?.high || Math.max(latestPrices['GC=F']?.high || goldPrice, goldPrice),
-      low: liveGold?.low || Math.min(latestPrices['GC=F']?.low || goldPrice, goldPrice),
-      open: liveGold?.open || goldPrice,
-      volume: liveGold?.volume || 0,
-      direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
-      updatedAt: new Date().toISOString(),
-      latency: liveGold ? 'REALTIME_SPOT' : 'STREAM',
-      source: liveGold?.source || 'FALLBACK',
-    };
-    results['GC=F'] = goldData;
-    results['XAUUSD'] = goldData;
-  }
+    if (liveSilver?.price) {
+      const silverPrice = liveSilver.price;
+      if (!priceHistory['SI=F']) priceHistory['SI=F'] = [];
+      priceHistory['SI=F'].push({ price: silverPrice, ts: Date.now() });
+      if (priceHistory['SI=F'].length > BUFFER_SIZE) priceHistory['SI=F'].shift();
+      const oldest = priceHistory['SI=F'][0]?.price;
+      const change5m = oldest ? ((silverPrice - oldest) / oldest) * 100 : 0;
 
-  // Process Spot Silver (SI=F key for backward compatibility, plus XAGUSD alias)
-  let silverPrice = liveSilver?.price || latestPrices['SI=F']?.price || 0;
-  if (silverPrice <= 0) {
-    try {
-      const fallbackQuote = await yahooFinance.quote('SI=F');
-      silverPrice = fallbackQuote?.regularMarketPrice || 0;
-    } catch (_) {}
-  }
-
-  if (silverPrice > 0) {
-    if (!priceHistory['SI=F']) priceHistory['SI=F'] = [];
-    priceHistory['SI=F'].push({ price: silverPrice, ts: Date.now() });
-    if (priceHistory['SI=F'].length > BUFFER_SIZE) priceHistory['SI=F'].shift();
-
-    const buf = priceHistory['SI=F'];
-    const oldest = buf[0]?.price;
-    const change5m = oldest ? ((silverPrice - oldest) / oldest) * 100 : 0;
-
-    const silverData = {
-      symbol: 'SI=F',
-      label: 'XAG/USD',
-      description: liveSilver?.source ? `Spot Silver (${liveSilver.source})` : 'Silver Spot',
-      unit: 'USD/oz',
-      correlation: 'direct',
-      price: silverPrice,
-      change5m: parseFloat(change5m.toFixed(4)),
-      changeDay: liveSilver?.changeDay !== undefined ? liveSilver.changeDay : (latestPrices['SI=F']?.changeDay || 0),
-      changeAbs: liveSilver?.changeAbs || 0,
-      bid: liveSilver?.bid || silverPrice,
-      ask: liveSilver?.ask || silverPrice,
-      high: liveSilver?.high || Math.max(latestPrices['SI=F']?.high || silverPrice, silverPrice),
-      low: liveSilver?.low || Math.min(latestPrices['SI=F']?.low || silverPrice, silverPrice),
-      open: liveSilver?.open || silverPrice,
-      volume: liveSilver?.volume || 0,
-      direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
-      updatedAt: new Date().toISOString(),
-      latency: liveSilver ? 'REALTIME_SPOT' : 'STREAM',
-      source: liveSilver?.source || 'FALLBACK',
-    };
-    results['SI=F'] = silverData;
-    results['XAGUSD'] = silverData;
+      const silverData = {
+        symbol: 'SI=F',
+        label: 'XAG/USD',
+        description: 'Spot Silver (TVC:SILVER)',
+        unit: 'USD/oz',
+        correlation: 'direct',
+        price: silverPrice,
+        change5m: parseFloat(change5m.toFixed(4)),
+        changeDay: liveSilver.changeDay || (latestPrices['SI=F']?.changeDay || 0),
+        changeAbs: liveSilver.changeAbs || 0,
+        bid: liveSilver.bid || silverPrice,
+        ask: liveSilver.ask || silverPrice,
+        high: liveSilver.high || silverPrice,
+        low: liveSilver.low || silverPrice,
+        open: liveSilver.open || silverPrice,
+        volume: liveSilver.volume || 0,
+        direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
+        updatedAt: new Date().toISOString(),
+        latency: 'REALTIME_HTTP',
+        source: liveSilver.source || 'HTTP_FALLBACK',
+      };
+      results['SI=F'] = silverData;
+      results['XAGUSD'] = silverData;
+    }
   }
 
   // Process Macro Correlation Instruments from Yahoo Finance
@@ -355,13 +512,7 @@ async function poll() {
   try {
     const prices = await fetchAllPrices();
     latestPrices = { ...latestPrices, ...prices };
-
-    if (io) {
-      io.emit('price_update', {
-        prices: latestPrices,
-        serverTime: new Date().toISOString(),
-      });
-    }
+    scheduleBroadcast();
   } catch (err) {
     console.error('[PRICE] Polling error:', err.message);
   }
@@ -370,14 +521,29 @@ async function poll() {
 function start() {
   if (isRunning) return;
   isRunning = true;
+  console.log('[PRICE] Real-time sub-second WebSocket tick streamer starting...');
+
+  // Start live TradingView quote WebSocket
+  if (!tvStreamer) {
+    tvStreamer = new TVStreamer(['OANDA:XAUUSD', 'TVC:SILVER']);
+  }
+
+  // Immediate first poll for macro instruments
+  poll();
   const intervalMs = config.intervals?.price || 2500;
-  console.log(`[PRICE] Real-time spot price engine starting — streaming every ${intervalMs / 1000}s`);
-  poll(); // immediate first tick
   pollTimer = setInterval(poll, intervalMs);
 }
 
 function stop() {
   if (pollTimer) clearInterval(pollTimer);
+  if (tvStreamer) {
+    tvStreamer.stop();
+    tvStreamer = null;
+  }
+  if (broadcastThrottleTimer) {
+    clearTimeout(broadcastThrottleTimer);
+    broadcastThrottleTimer = null;
+  }
   isRunning = false;
 }
 
