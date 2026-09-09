@@ -2,11 +2,13 @@
 // Real-Time Multi-Wire News Aggregator with Filter Pills & AI Reasoning
 
 import { useState, useMemo } from 'react';
-import { Newspaper, ExternalLink, Copy, Check, Filter, Sparkles, Radio } from 'lucide-react';
+import { Newspaper, ExternalLink, Copy, Check, Filter, Sparkles, Radio, Volume2 } from 'lucide-react';
+import { speakSquawk } from '../utils/audioAlerts';
 
 export default function NewsTerminal({ newsFeed = [] }) {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'HIGH' | 'BULLISH' | 'BEARISH' | 'GEO'
   const [copiedId, setCopiedId] = useState(null);
+  const [squawkingId, setSquawkingId] = useState(null);
 
   const filteredNews = useMemo(() => {
     return newsFeed.filter((item) => {
@@ -29,6 +31,17 @@ export default function NewsTerminal({ newsFeed = [] }) {
     navigator.clipboard.writeText(text).catch(() => {});
     setCopiedId(item.id);
     setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const handleManualSquawk = (item) => {
+    setSquawkingId(item.id || item.guid || item.headline);
+    speakSquawk(`${item.headline || item.title}. Market bias: ${item.bias || 'Neutral'}. ${item.reasoning || ''}`, {
+      category: 'news',
+      preChime: 'flash',
+      priority: true,
+      cooldownSeconds: 0,
+    });
+    setTimeout(() => setSquawkingId(null), 2000);
   };
 
   const filters = [
@@ -108,6 +121,14 @@ export default function NewsTerminal({ newsFeed = [] }) {
                     <span className="news-time-tag">
                       {item.publishedAt ? new Date(item.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
+                    <button
+                      className={`btn-icon ${squawkingId === (item.id || item.guid || headline) ? 'active' : ''}`}
+                      style={{ width: '24px', height: '24px' }}
+                      onClick={() => handleManualSquawk(item)}
+                      title="Audio Squawk (Indian Female Voice)"
+                    >
+                      <Volume2 size={12} style={{ color: squawkingId === (item.id || item.guid || headline) ? 'var(--gold-glow)' : undefined }} />
+                    </button>
                     <button
                       className="btn-icon"
                       style={{ width: '24px', height: '24px' }}

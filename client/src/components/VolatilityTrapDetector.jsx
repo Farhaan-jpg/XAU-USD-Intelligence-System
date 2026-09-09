@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, Flame, ShieldAlert, ArrowRightCircle, Sparkles } from 'lucide-react';
+import { speakSquawk } from '../utils/audioAlerts';
 
 export default function VolatilityTrapDetector({ prices = {}, calendarData = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
@@ -44,6 +45,20 @@ export default function VolatilityTrapDetector({ prices = {}, calendarData = {} 
       }
     }
   }, [currentPrice]);
+
+  // Voice Alert on rapid volatility expansion
+  useEffect(() => {
+    if (trapAlert) {
+      speakSquawk(
+        `Volatility Alert. ${trapAlert.title}. Velocity of ${trapAlert.delta} dollars in under sixty seconds. Beware of fakeout.`,
+        {
+          category: 'volatility',
+          preChime: 'trap',
+          priority: true,
+        }
+      );
+    }
+  }, [trapAlert?.timestamp]);
 
   return (
     <div className="panel-card" style={{ background: trapAlert ? 'rgba(239, 68, 68, 0.05)' : 'var(--bg-card)' }}>

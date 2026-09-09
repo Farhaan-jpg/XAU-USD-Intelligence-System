@@ -2,8 +2,9 @@
 // Institutional Smart Money Concepts (SMC) & Liquidity Level Radar
 // Detects Buy-Side Liquidity (BSL), Sell-Side Liquidity (SSL), Fair Value Gaps (FVG), and Order Blocks
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { Target, Layers, ArrowUpRight, ArrowDownRight, ShieldCheck, Zap } from 'lucide-react';
+import { speakSquawk } from '../utils/audioAlerts';
 
 export default function SmartLiquidityRadar({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
@@ -47,6 +48,42 @@ export default function SmartLiquidityRadar({ prices = {} }) {
       equilibrium: p.toFixed(2),
     };
   }, [spotPrice, gold.high, gold.low]);
+
+  // Track liquidity sweep events
+  const sweptRef = useRef({ bsl: false, ssl: false });
+  useEffect(() => {
+    if (!spotPrice || !smcLevels.bslMajor || !smcLevels.sslMajor) return;
+    const bsl = parseFloat(smcLevels.bslMajor);
+    const ssl = parseFloat(smcLevels.sslMajor);
+
+    if (spotPrice >= bsl && !sweptRef.current.bsl) {
+      sweptRef.current.bsl = true;
+      speakSquawk(
+        `Liquidity Alert. Buy-side liquidity pool swept above equal highs at ${spotPrice.toFixed(2)} dollars. Watch for smart money rejection or expansion.`,
+        {
+          category: 'liquidity',
+          preChime: 'liquidity',
+          priority: true,
+        }
+      );
+    } else if (spotPrice < bsl - 3) {
+      sweptRef.current.bsl = false;
+    }
+
+    if (spotPrice <= ssl && !sweptRef.current.ssl) {
+      sweptRef.current.ssl = true;
+      speakSquawk(
+        `Liquidity Alert. Sell-side liquidity swept below equal lows at ${spotPrice.toFixed(2)} dollars. Retail stop run underway.`,
+        {
+          category: 'liquidity',
+          preChime: 'liquidity',
+          priority: true,
+        }
+      );
+    } else if (spotPrice > ssl + 3) {
+      sweptRef.current.ssl = false;
+    }
+  }, [spotPrice, smcLevels.bslMajor, smcLevels.sslMajor]);
 
   return (
     <div className="panel-card">

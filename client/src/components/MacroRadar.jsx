@@ -61,8 +61,11 @@ export default function MacroRadar({ prices = {} }) {
   // Audio trigger on new divergence
   useEffect(() => {
     if (divergence) {
-      playDivergenceAlert();
-      speakSquawk(`Macro Alert. ${divergence.title}. ${divergence.desc}`);
+      speakSquawk(`Macro Alert. ${divergence.title}. ${divergence.desc}`, {
+        category: 'divergence',
+        preChime: 'divergence',
+        priority: true,
+      });
     }
   }, [divergence?.type]);
 

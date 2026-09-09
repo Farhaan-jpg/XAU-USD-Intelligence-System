@@ -1,8 +1,11 @@
-// client/src/components/SettingsModal.jsx
-// Comprehensive Terminal Settings & Real-Time AI Model Configuration
-
 import { useState, useEffect } from 'react';
-import { X, Sparkles, Send, Check, AlertCircle, RefreshCw, Key, Shield } from 'lucide-react';
+import { X, Sparkles, Send, Check, AlertCircle, RefreshCw, Key, Shield, Volume2, Mic } from 'lucide-react';
+import {
+  getVoiceSettings,
+  updateVoiceSettings,
+  getAvailableVoices,
+  testIndianFemaleVoice,
+} from '../utils/audioAlerts';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(true);
@@ -21,6 +24,18 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
+
+  // Voice Settings State
+  const [voiceSettings, setVoiceSettingsState] = useState(getVoiceSettings());
+  const [voicesList, setVoicesList] = useState([]);
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setVoiceSettingsState(getVoiceSettings());
+    const voices = getAvailableVoices();
+    setVoicesList(voices);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -50,6 +65,8 @@ export default function SettingsModal({ isOpen, onClose }) {
     setSaving(true);
     setSaveMessage('');
     try {
+      updateVoiceSettings(voiceSettings);
+
       const payload = {
         googleKey: googleKey.includes('...') ? undefined : googleKey,
         googleModel: selectedGoogleModel,
@@ -332,6 +349,180 @@ export default function SettingsModal({ isOpen, onClose }) {
                       {telegramStatus.success ? '✅ Test alert delivered!' : `❌ ${telegramStatus.error}`}
                     </span>
                   )}
+                </div>
+              </div>
+
+              {/* Voice Squawk & Audio Alerts Section */}
+              <div
+                style={{
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--gold-glow)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Volume2 size={14} />
+                    INSTITUTIONAL VOICE SQUAWK & AUDIO ALERTS (INDIAN FEMALE)
+                  </span>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => {
+                      setIsTestingVoice(true);
+                      testIndianFemaleVoice();
+                      setTimeout(() => setIsTestingVoice(false), 3000);
+                    }}
+                    disabled={isTestingVoice}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '11px',
+                      padding: '5px 12px',
+                      borderColor: 'var(--gold-glow)',
+                      color: 'var(--gold-glow)',
+                    }}
+                  >
+                    <Volume2 size={12} />
+                    <span>{isTestingVoice ? 'Squawking...' : '🔊 Test Indian Female Voice'}</span>
+                  </button>
+                </div>
+
+                <div className="calc-field">
+                  <label className="calc-label">VOICE SYNTHESIZER ENGINE</label>
+                  <select
+                    className="calc-input"
+                    value={voiceSettings.voiceUri}
+                    onChange={(e) => {
+                      const next = { ...voiceSettings, voiceUri: e.target.value };
+                      setVoiceSettingsState(next);
+                      updateVoiceSettings(next);
+                    }}
+                  >
+                    <option value="auto">
+                      ⭐ Auto-Detect Indian Female Voice (Recommended: Heera / Neerja / Natural)
+                    </option>
+                    {voicesList.map((v, i) => (
+                      <option key={v.voice.voiceURI || i} value={v.voice.voiceURI || v.name}>
+                        {v.isIndianFemale ? '🇮🇳 ' : ''}{v.name} ({v.lang}) {v.isIndianFemale ? '— Indian Female' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
+                    Prioritizes authentic Indian English female speech profile (Microsoft Heera / Neerja) with natural floor squawk cadence.
+                  </span>
+                </div>
+
+                <div className="calc-inputs-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+                  <div className="calc-field">
+                    <label className="calc-label">SQUAWK VOLUME ({Math.round(voiceSettings.volume * 100)}%)</label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={voiceSettings.volume}
+                      onChange={(e) => {
+                        const next = { ...voiceSettings, volume: parseFloat(e.target.value) };
+                        setVoiceSettingsState(next);
+                        updateVoiceSettings(next);
+                      }}
+                      style={{ width: '100%', accentColor: 'var(--gold-primary)' }}
+                    />
+                  </div>
+
+                  <div className="calc-field">
+                    <label className="calc-label">DELIVERY SPEED ({voiceSettings.rate}x)</label>
+                    <input
+                      type="range"
+                      min="0.8"
+                      max="1.3"
+                      step="0.02"
+                      value={voiceSettings.rate}
+                      onChange={(e) => {
+                        const next = { ...voiceSettings, rate: parseFloat(e.target.value) };
+                        setVoiceSettingsState(next);
+                        updateVoiceSettings(next);
+                      }}
+                      style={{ width: '100%', accentColor: 'var(--gold-primary)' }}
+                    />
+                  </div>
+
+                  <div className="calc-field">
+                    <label className="calc-label">FEMALE PITCH ({voiceSettings.pitch})</label>
+                    <input
+                      type="range"
+                      min="0.85"
+                      max="1.25"
+                      step="0.02"
+                      value={voiceSettings.pitch}
+                      onChange={(e) => {
+                        const next = { ...voiceSettings, pitch: parseFloat(e.target.value) };
+                        setVoiceSettingsState(next);
+                        updateVoiceSettings(next);
+                      }}
+                      style={{ width: '100%', accentColor: 'var(--gold-primary)' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="calc-label" style={{ marginBottom: '8px', display: 'block' }}>
+                    ACTIVE VOICE EVENT CHANNELS
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+                    {[
+                      { key: 'news', label: 'High-Impact Breaking News' },
+                      { key: 'calendar', label: 'Economic Calendar (T-5m & Releases)' },
+                      { key: 'confluence', label: 'Confluence Bias Shifts (Strong Buy/Sell)' },
+                      { key: 'divergence', label: 'Macro Intermarket Divergences' },
+                      { key: 'liquidity', label: 'Smart Liquidity Sweeps (BSL/SSL)' },
+                      { key: 'volatility', label: 'Volatility Traps & Fakeouts' },
+                      { key: 'sessions', label: 'Market Session Opens (London/NY/Asia)' },
+                      { key: 'guidance', label: 'AI Market Guidance & Regimes' },
+                    ].map(({ key, label }) => {
+                      const enabled = voiceSettings.enabledEvents[key] !== false;
+                      return (
+                        <label
+                          key={key}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '11px',
+                            color: enabled ? '#fff' : 'var(--text-dim)',
+                            background: enabled ? 'rgba(245, 158, 11, 0.08)' : 'rgba(0,0,0,0.2)',
+                            padding: '6px 10px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: enabled ? '1px solid var(--border-gold)' : '1px solid var(--border-subtle)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={(e) => {
+                              const next = {
+                                ...voiceSettings,
+                                enabledEvents: {
+                                  ...voiceSettings.enabledEvents,
+                                  [key]: e.target.checked,
+                                },
+                              };
+                              setVoiceSettingsState(next);
+                              updateVoiceSettings(next);
+                            }}
+                            style={{ accentColor: 'var(--gold-primary)' }}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

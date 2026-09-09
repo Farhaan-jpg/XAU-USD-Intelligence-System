@@ -17,7 +17,7 @@ import StatusBar from './components/StatusBar';
 import SmartLiquidityRadar from './components/SmartLiquidityRadar';
 import VolatilityTrapDetector from './components/VolatilityTrapDetector';
 import COTSentimentGauge from './components/COTSentimentGauge';
-import { playFlashAlert, playEventWarning } from './utils/audioAlerts';
+import { playFlashAlert, playEventWarning, speakSquawk } from './utils/audioAlerts';
 import {
   LayoutDashboard,
   Sparkles,
@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert } = useSocket();
+  const { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert, calendarAlert } = useSocket();
   const [activeTab, setActiveTab] = useState('TERMINAL'); // 'TERMINAL' | 'COPILOT' | 'MACRO' | 'NEWS' | 'CALENDAR' | 'CALCULATOR'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [aiTelemetry, setAiTelemetry] = useState({});
@@ -49,20 +49,79 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Audio flash when high impact news arrives
+  // Voice & Audio Squawk when high-impact breaking news arrives
   useEffect(() => {
     if (latestAlert && latestAlert.impact === 'HIGH') {
-      playFlashAlert();
+      const headline = latestAlert.headline || latestAlert.title || '';
+      const bias = latestAlert.bias ? `Market bias: ${latestAlert.bias.toLowerCase()}.` : '';
+      speakSquawk(`Breaking News Alert. ${headline}. ${bias}`, {
+        category: 'news',
+        preChime: 'flash',
+        priority: true,
+      });
     }
-  }, [latestAlert]);
+  }, [latestAlert?.id || latestAlert?.guid || latestAlert?.headline]);
 
-  // Audio warning when pre-event alert triggers
+  // Audio & Voice warning for Economic Calendar Alerts
+  useEffect(() => {
+    if (calendarAlert?.event) {
+      const ev = calendarAlert.event;
+      const mins = calendarAlert.minutesLeft || 5;
+      speakSquawk(
+        `Economic Warning. High-impact event ${ev.title} for ${ev.currency} releases in ${mins} minutes. Expect elevated volatility.`,
+        {
+          category: 'calendar',
+          preChime: 'event',
+          priority: true,
+        }
+      );
+    }
+  }, [calendarAlert?.timestamp]);
+
+  // Audio warning when pre-event alert triggers on calendar data
   const showAlertBanner = calendarData?.preEventAlert;
   useEffect(() => {
-    if (showAlertBanner) {
-      playEventWarning();
+    if (showAlertBanner && showAlertBanner.title) {
+      speakSquawk(
+        `Economic Warning. ${showAlertBanner.title} imminent in ${showAlertBanner.minutesLeft || 5} minutes.`,
+        {
+          category: 'calendar',
+          preChime: 'event',
+        }
+      );
     }
-  }, [showAlertBanner]);
+  }, [showAlertBanner?.title]);
+
+  // Market Session Transitions
+  useEffect(() => {
+    const checkSessionTransition = () => {
+      const now = new Date();
+      const h = now.getUTCHours();
+      const m = now.getUTCMinutes();
+
+      if (m === 0) {
+        if (h === 7) {
+          speakSquawk('London session is now open. European institutional liquidity entering gold market.', {
+            category: 'sessions',
+            preChime: 'session',
+          });
+        } else if (h === 12) {
+          speakSquawk('London and New York overlap session is now active. Peak daily gold volume and volatility expected.', {
+            category: 'sessions',
+            preChime: 'session',
+            priority: true,
+          });
+        } else if (h === 0) {
+          speakSquawk('Asian session is now active. Monitoring Asian accumulation range and liquidity boundaries.', {
+            category: 'sessions',
+            preChime: 'session',
+          });
+        }
+      }
+    };
+    const timer = setInterval(checkSessionTransition, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const gold = prices['GC=F'] || {};
   const currentGoldPrice = parseFloat(gold.price || 2350);

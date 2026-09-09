@@ -31,6 +31,7 @@ export function useSocket() {
   const [calendarData, setCalendarData] = useState(null);
   const [cotData, setCotData] = useState(null);
   const [latestAlert, setLatestAlert] = useState(null);
+  const [calendarAlert, setCalendarAlert] = useState(null);
 
   const measureLatency = useCallback((socket) => {
     const start = Date.now();
@@ -97,20 +98,6 @@ export function useSocket() {
       // Set as latest alert for notification effects
       if (item.impact === 'HIGH') {
         setLatestAlert(item);
-        // Play audio notification if supported
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.setValueAtTime(880, ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
-          gain.gain.setValueAtTime(0.08, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.4);
-        } catch (_) { /* AudioContext not available */ }
       }
     };
 
@@ -132,6 +119,10 @@ export function useSocket() {
       setCalendarData(data);
     };
 
+    const onCalendarAlert = (alert) => {
+      setCalendarAlert(alert);
+    };
+
     const onCotUpdate = (data) => {
       if (data) setCotData(data);
     };
@@ -143,6 +134,7 @@ export function useSocket() {
     socket.on('news_item_update', onNewsItemUpdate);
     socket.on('news_batch', onNewsBatch);
     socket.on('calendar_update', onCalendarUpdate);
+    socket.on('calendar_alert', onCalendarAlert);
     socket.on('cot_update', onCotUpdate);
 
     // Sync initial state if already connected
@@ -159,11 +151,12 @@ export function useSocket() {
       socket.off('news_item_update', onNewsItemUpdate);
       socket.off('news_batch', onNewsBatch);
       socket.off('calendar_update', onCalendarUpdate);
+      socket.off('calendar_alert', onCalendarAlert);
       socket.off('cot_update', onCotUpdate);
       if (pingTimerRef.current) clearInterval(pingTimerRef.current);
       clearInterval(backupPollInterval);
     };
   }, [measureLatency]);
 
-  return { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert };
+  return { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert, calendarAlert };
 }

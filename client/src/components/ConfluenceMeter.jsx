@@ -1,8 +1,9 @@
 // client/src/components/ConfluenceMeter.jsx
 // 0-100 Institutional Confluence & Composite Bias Meter for XAU/USD
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { ShieldAlert, TrendingUp, TrendingDown, Gauge, Zap } from 'lucide-react';
+import { speakSquawk } from '../utils/audioAlerts';
 
 export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarData = {}, cotData = {} }) {
   const calculation = useMemo(() => {
@@ -55,9 +56,6 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     techVal = Math.max(0, Math.min(100, techVal));
 
     // 4. Macro Catalyst & Calendar Event Direction (0-100)
-    // Red-folder events create two-way volatility risk.
-    // When a high-impact event is imminent (< 30m away), directional conviction is neutral (50)
-    // to prevent premature gambling before the numbers drop.
     let eventRiskVal = 50;
     let imminentEventWarning = null;
     const upcoming = calendarData?.events || calendarData?.upcomingEvents || [];
@@ -71,11 +69,10 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
         const act = parseFloat(nextHigh.actual);
         const fcast = parseFloat(nextHigh.forecast);
         if (!isNaN(act) && !isNaN(fcast)) {
-          // Inflation/labor beat = Stronger USD = Gold Bearish (30); Miss = Gold Bullish (70)
           eventRiskVal = act > fcast ? 30 : 70;
         }
       } else if (diffMins >= 0 && diffMins <= 30) {
-        eventRiskVal = 50; // Neutral conviction during pre-news lockup
+        eventRiskVal = 50;
         imminentEventWarning = `${nextHigh.title} in ${diffMins}m`;
       }
     }
@@ -84,10 +81,9 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     let cotVal = 50;
     const mmBias = cotData?.managedMoney?.biasPct || 87.1;
     const retailLong = cotData?.retailSentiment?.longPct || 62;
-    if (mmBias >= 80) cotVal += 15; // Strong institutional speculative support
+    if (mmBias >= 80) cotVal += 15;
     else if (mmBias <= 50) cotVal -= 15;
 
-    // Contrarian retail: if crowd is heavily short (<45%), bullish squeeze; if crowd is heavily long (>65%), bearish trap
     if (retailLong <= 45) cotVal += 15;
     else if (retailLong >= 65) cotVal -= 15;
     cotVal = Math.max(0, Math.min(100, cotVal));
@@ -135,6 +131,35 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       imminentEventWarning,
     };
   }, [prices, newsFeed, calendarData, cotData]);
+
+  // Voice Alert on Confluence Shift to Extreme Territory
+  const prevVerdictRef = useRef(calculation.verdict);
+  useEffect(() => {
+    const prev = prevVerdictRef.current;
+    const current = calculation.verdict;
+    if (prev !== current) {
+      if (current === 'STRONG BUY') {
+        speakSquawk(
+          `Institutional Bias Alert. Confluence shifted to Strong Buy at ${calculation.composite} percent. Macro and order flow aligned.`,
+          {
+            category: 'confluence',
+            preChime: 'confluence',
+            priority: true,
+          }
+        );
+      } else if (current === 'STRONG SELL') {
+        speakSquawk(
+          `Institutional Bias Alert. Confluence shifted to Strong Sell at ${calculation.composite} percent. Downside pressure accelerating.`,
+          {
+            category: 'confluence',
+            preChime: 'confluence',
+            priority: true,
+          }
+        );
+      }
+      prevVerdictRef.current = current;
+    }
+  }, [calculation.verdict, calculation.composite]);
 
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
