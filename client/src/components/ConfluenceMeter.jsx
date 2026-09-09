@@ -6,10 +6,10 @@ import { ShieldAlert, TrendingUp, TrendingDown, Gauge, Zap } from 'lucide-react'
 
 export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarData = {} }) {
   const calculation = useMemo(() => {
-    const gold = prices['GC=F'] || {};
+    const gold = prices['GC=F'] || prices['XAUUSD'] || {};
     const dxy = prices['DX-Y.NYB'] || {};
     const us10y = prices['^TNX'] || {};
-    const silver = prices['SI=F'] || {};
+    const silver = prices['SI=F'] || prices['XAGUSD'] || {};
     const usdjpy = prices['JPY=X'] || {};
 
     const goldChg = parseFloat(gold.change5m || 0);

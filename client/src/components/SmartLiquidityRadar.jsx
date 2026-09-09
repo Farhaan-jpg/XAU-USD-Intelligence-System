@@ -6,12 +6,12 @@ import { useMemo } from 'react';
 import { Target, Layers, ArrowUpRight, ArrowDownRight, ShieldCheck, Zap } from 'lucide-react';
 
 export default function SmartLiquidityRadar({ prices = {} }) {
-  const gold = prices['GC=F'] || {};
-  const spotPrice = parseFloat(gold.price || 2350);
+  const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+  const spotPrice = parseFloat(gold.price || 0);
 
   // Compute ICT Institutional SMC Levels dynamically based on spot
   const smcLevels = useMemo(() => {
-    const p = spotPrice;
+    const p = spotPrice || 4400;
 
     return {
       // Buy-Side Liquidity (BSL) resting stop pools

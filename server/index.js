@@ -70,17 +70,17 @@ app.get('/api/ai/models', (req, res) => {
 app.post('/api/ai/copilot', async (req, res) => {
   try {
     const prices = priceEngine.getLatest();
-    const gold = prices['GC=F'] || {};
+    const gold = prices['GC=F'] || prices['XAUUSD'] || {};
     const dxy = prices['DX-Y.NYB'] || {};
     const us10y = prices['^TNX'] || {};
-    const silver = prices['SI=F'] || {};
+    const silver = prices['SI=F'] || prices['XAGUSD'] || {};
     const recentNews = newsEngine.getLatest().slice(0, 5).map((n) => n.headline || n.title);
     const calendarData = calendarEngine.getData();
     const nextEvent = (calendarData?.upcomingEvents || []).find((e) => e.impact === 'HIGH');
 
-    const goldPrice = parseFloat(gold.price || 2350);
-    const silverPrice = parseFloat(silver.price || 30);
-    const gsr = silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '80.0';
+    const goldPrice = parseFloat(gold.price || 4400);
+    const silverPrice = parseFloat(silver.price || 66);
+    const gsr = silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '66.0';
 
     const marketData = {
       goldPrice: goldPrice.toFixed(2),

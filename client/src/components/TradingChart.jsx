@@ -7,12 +7,32 @@ import { Layers, Maximize2, ExternalLink, ShieldAlert } from 'lucide-react';
 export default function TradingChart({ prices = {} }) {
   const [interval, setInterval] = useState('5'); // '1', '5', '15', '60', '240', 'D'
 
-  const gold = prices['GC=F'] || {};
-  const spotPrice = parseFloat(gold.price || 2350);
+  const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+  const spotPrice = parseFloat(gold.price || 0);
 
-  // Approximate institutional pivots based on spot
+  // Institutional floor pivots based on authentic spot range
   const pivots = useMemo(() => {
     const p = spotPrice;
+    if (!p) return { r2: '--', r1: '--', p: '--', s1: '--', s2: '--' };
+
+    if (gold.high && gold.low && gold.high > gold.low) {
+      const H = parseFloat(gold.high);
+      const L = parseFloat(gold.low);
+      const C = p;
+      const P = (H + L + C) / 3;
+      const R1 = (2 * P) - L;
+      const S1 = (2 * P) - H;
+      const R2 = P + (H - L);
+      const S2 = P - (H - L);
+      return {
+        r2: R2.toFixed(2),
+        r1: R1.toFixed(2),
+        p: P.toFixed(2),
+        s1: S1.toFixed(2),
+        s2: S2.toFixed(2),
+      };
+    }
+
     return {
       r2: (p + 14.5).toFixed(2),
       r1: (p + 7.2).toFixed(2),
@@ -20,7 +40,7 @@ export default function TradingChart({ prices = {} }) {
       s1: (p - 7.2).toFixed(2),
       s2: (p - 14.5).toFixed(2),
     };
-  }, [spotPrice]);
+  }, [spotPrice, gold.high, gold.low]);
 
   const intervals = [
     { label: '1M', val: '1' },
@@ -44,12 +64,13 @@ export default function TradingChart({ prices = {} }) {
               LIVE SPOT GOLD &bull; OANDA:XAUUSD
             </div>
             <div className="spot-price-big">
-              <span>${spotPrice.toFixed(2)}</span>
+              <span>${spotPrice > 0 ? spotPrice.toFixed(2) : '--'}</span>
               <span
                 className="spot-price-change"
-                style={{ color: parseFloat(gold.change5m || 0) >= 0 ? 'var(--bull-glow)' : 'var(--bear-glow)' }}
+                style={{ color: parseFloat(gold.changeDay || gold.change5m || 0) >= 0 ? 'var(--bull-glow)' : 'var(--bear-glow)' }}
+                title={`24h Change: ${gold.changeDay || 0}% | 5m Velocity: ${gold.change5m || 0}%`}
               >
-                {gold.change5m ? `${parseFloat(gold.change5m) >= 0 ? '+' : ''}${gold.change5m}%` : '0.00%'}
+                {gold.changeDay !== undefined ? `${parseFloat(gold.changeDay) >= 0 ? '+' : ''}${gold.changeDay}%` : `${parseFloat(gold.change5m || 0) >= 0 ? '+' : ''}${gold.change5m || 0}%`}
               </span>
             </div>
           </div>

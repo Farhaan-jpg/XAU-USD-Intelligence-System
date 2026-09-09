@@ -6,8 +6,8 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, Flame, ShieldAlert, ArrowRightCircle, Sparkles } from 'lucide-react';
 
 export default function VolatilityTrapDetector({ prices = {}, calendarData = {} }) {
-  const gold = prices['GC=F'] || {};
-  const currentPrice = parseFloat(gold.price || 2350);
+  const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+  const currentPrice = parseFloat(gold.price || 0);
 
   const priceHistory = useRef([]);
   const [trapAlert, setTrapAlert] = useState(null);

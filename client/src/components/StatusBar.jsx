@@ -4,14 +4,16 @@
 import { ArrowUpRight, ArrowDownRight, Radio, Cpu, Sparkles } from 'lucide-react';
 
 export default function StatusBar({ connected = false, prices = {}, newsFeed = [], aiTelemetry = {} }) {
-  const gold = prices['GC=F'] || {};
-  const silver = prices['SI=F'] || {};
+  const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+  const silver = prices['SI=F'] || prices['XAGUSD'] || {};
   const dxy = prices['DX-Y.NYB'] || {};
   const us10y = prices['^TNX'] || {};
 
-  const goldPrice = parseFloat(gold.price || 2350).toFixed(2);
-  const silverPrice = parseFloat(silver.price || 30).toFixed(2);
-  const gsr = (parseFloat(goldPrice) / parseFloat(silverPrice)).toFixed(1);
+  const goldPriceNum = parseFloat(gold.price || 0);
+  const silverPriceNum = parseFloat(silver.price || 0);
+  const goldPrice = goldPriceNum > 0 ? goldPriceNum.toFixed(2) : '--';
+  const silverPrice = silverPriceNum > 0 ? silverPriceNum.toFixed(2) : '--';
+  const gsr = (goldPriceNum > 0 && silverPriceNum > 0) ? (goldPriceNum / silverPriceNum).toFixed(1) : '66.0';
 
   const goldChg = parseFloat(gold.change5m || 0);
   const dxyChg = parseFloat(dxy.change5m || 0);

@@ -60,8 +60,8 @@ export default function AICopilot({ prices = {}, newsFeed = [], calendarData = {
     if (!copilotData) return;
     setBroadcastStatus('sending');
     try {
-      const gold = prices['GC=F'] || {};
-      const spot = gold.price || '2350';
+      const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+      const spot = gold.price || '4400';
       const res = await fetch('/api/ai/broadcast-signal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

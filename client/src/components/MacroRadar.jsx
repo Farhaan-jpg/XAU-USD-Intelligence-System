@@ -3,8 +3,8 @@ import { Radar, ArrowUpRight, ArrowDownRight, AlertTriangle, Activity } from 'lu
 import { playDivergenceAlert, speakSquawk } from '../utils/audioAlerts';
 
 export default function MacroRadar({ prices = {} }) {
-  const gold = prices['GC=F'] || {};
-  const silver = prices['SI=F'] || {};
+  const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+  const silver = prices['SI=F'] || prices['XAGUSD'] || {};
   const dxy = prices['DX-Y.NYB'] || {};
   const us10y = prices['^TNX'] || {};
   const us02y = prices['^IRX'] || {};
@@ -13,7 +13,7 @@ export default function MacroRadar({ prices = {} }) {
 
   const goldPrice = parseFloat(gold.price || 0);
   const silverPrice = parseFloat(silver.price || 0);
-  const gsr = goldPrice > 0 && silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '82.4';
+  const gsr = goldPrice > 0 && silverPrice > 0 ? (goldPrice / silverPrice).toFixed(1) : '66.0';
 
   // Divergence Engine with Sound & Voice Squawk
   const divergence = useMemo(() => {
@@ -71,7 +71,7 @@ export default function MacroRadar({ prices = {} }) {
       symbol: 'GC=F',
       name: 'XAU/USD',
       label: 'Gold Spot',
-      price: goldPrice > 0 ? `$${goldPrice.toFixed(2)}` : '$2350.00',
+      price: goldPrice > 0 ? `$${goldPrice.toFixed(2)}` : '--',
       chg: gold.change5m || 0,
       primary: true,
       unit: 'USD/oz',
@@ -80,7 +80,7 @@ export default function MacroRadar({ prices = {} }) {
       symbol: 'SI=F',
       name: 'XAG/USD',
       label: 'Silver Spot',
-      price: silverPrice > 0 ? `$${silverPrice.toFixed(2)}` : '$30.40',
+      price: silverPrice > 0 ? `$${silverPrice.toFixed(2)}` : '--',
       chg: silver.change5m || 0,
       unit: 'USD/oz',
     },
