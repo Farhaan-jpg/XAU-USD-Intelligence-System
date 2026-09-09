@@ -509,8 +509,20 @@ body {
 /* Macro Radar Grid */
 .macro-radar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 992px) {
+  .macro-radar-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .macro-radar-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .macro-card {
@@ -929,21 +941,32 @@ body {
 .calendar-events-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .calendar-events-table th {
   text-align: left;
   font-size: 11px;
+  font-weight: 700;
   color: var(--text-dim);
   text-transform: uppercase;
-  padding: 8px 10px;
+  letter-spacing: 0.5px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .calendar-events-table td {
-  padding: 10px;
+  padding: 10px 8px;
   font-size: 12px;
   border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 .calendar-events-table tr:hover td {

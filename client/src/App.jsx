@@ -161,15 +161,17 @@ export default function App() {
               </div>
             </div>
 
-            {/* Bottom Grid: Macro Radar & Live News Wire */}
+            {/* Middle Section: Macro Correlation Radar */}
+            <MacroRadar prices={prices} />
+
+            {/* Bottom Grid: Intelligence & News Terminal */}
             <div className="grid-terminal-bottom">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <MacroRadar prices={prices} />
                 <AICopilot prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+                <EconomicCalendar calendarData={calendarData} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <NewsTerminal newsFeed={newsFeed} />
-                <EconomicCalendar calendarData={calendarData} />
               </div>
             </div>
           </>

@@ -57,10 +57,10 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     // 4. Economic Calendar Risk Impact (0-100)
     // If high-impact event is imminent (< 30 min), risk volatility rises
     let eventRiskVal = 50;
-    const upcoming = calendarData?.upcomingEvents || [];
-    const nextHigh = upcoming.find((e) => e.impact === 'HIGH');
+    const upcoming = calendarData?.events || calendarData?.upcomingEvents || [];
+    const nextHigh = upcoming.find((e) => e.impact === 'HIGH' && new Date(e.date || e.timeUTC) > new Date());
     if (nextHigh) {
-      const diffMins = Math.round((new Date(nextHigh.timeUTC).getTime() - Date.now()) / 60000);
+      const diffMins = Math.round((new Date(nextHigh.date || nextHigh.timeUTC).getTime() - Date.now()) / 60000);
       if (diffMins >= 0 && diffMins <= 30) {
         // High volatility window
         eventRiskVal = 80;
