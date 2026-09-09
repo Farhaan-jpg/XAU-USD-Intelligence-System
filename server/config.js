@@ -36,7 +36,7 @@ const config = {
   // Polling intervals (ms) — optimized for zero delay and real-time streaming
   intervals: {
     price: 2500,       // 2.5 seconds (ultra responsive tick streaming)
-    news: 8000,        // 8 seconds (fast real-time financial wire refresh)
+    news: 3500,        // 3.5 seconds (ultra-fast real-time financial wire refresh)
     calendar: 10000,   // 10 seconds
   },
 

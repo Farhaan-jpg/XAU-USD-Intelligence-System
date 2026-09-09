@@ -9,10 +9,13 @@ const aiOrchestrator = require('../utils/aiOrchestrator');
 const telegramEngine = require('./telegramEngine');
 
 const parser = new Parser({
-  timeout: 4000, // 4-second hard cutoff to prevent hanging connections
+  timeout: 3500, // 3.5-second hard cutoff to prevent hanging connections
   headers: {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
     'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+    'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   },
   customFields: {
     item: ['media:content', 'description', 'summary', 'content'],
@@ -36,7 +39,10 @@ function init(socketIo) {
  */
 async function fetchFeed(feed) {
   try {
-    const result = await parser.parseURL(feed.url);
+    // Add cache-busting timestamp to bypass intermediary CDN edge caches (Cloudflare, Akamai, etc.)
+    const cacheBuster = `_t=${Date.now()}`;
+    const targetUrl = feed.url.includes('?') ? `${feed.url}&${cacheBuster}` : `${feed.url}?${cacheBuster}`;
+    const result = await parser.parseURL(targetUrl);
     return (result.items || []).map((item) => ({
       source: feed.name,
       title: (item.title || '').trim(),
@@ -177,13 +183,12 @@ function start() {
   if (isRunning) return;
   isRunning = true;
 
-  const pollIntervalMs = config.intervals.news || 15000;
+  const pollIntervalMs = config.intervals.news || 3500;
   console.log(`[NEWS] Ultra-low-latency engine starting — polling ${config.rssFeeds.length} feeds independently every ${pollIntervalMs / 1000}s`);
 
-  // Stagger each feed by 1.2s to distribute network bandwidth and prevent CPU spikes
+  // Fast-start feeds with gentle 250ms stagger so all feeds are streaming within 2s
   config.rssFeeds.forEach((feed, idx) => {
-    // Initial fetch with staggered delay
-    const initialDelay = idx * 1200;
+    const initialDelay = idx * 250;
     const initialTimeout = setTimeout(() => {
       pollIndividualFeed(feed);
       // Recurring independent timer

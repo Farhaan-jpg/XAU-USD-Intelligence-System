@@ -477,12 +477,13 @@ export default function SettingsModal({ isOpen, onClose }) {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
                     {[
                       { key: 'news', label: 'High-Impact Breaking News' },
+                      { key: 'trade_alert', label: 'Trade Copilot Execution (Buy/Sell & Targets)' },
                       { key: 'calendar', label: 'Economic Calendar (T-5m & Releases)' },
-                      { key: 'confluence', label: 'Market Bias Voice Squawks (Chime by default)' },
                       { key: 'divergence', label: 'Macro Intermarket Divergences' },
                       { key: 'liquidity', label: 'Smart Liquidity Sweeps (BSL/SSL)' },
                       { key: 'volatility', label: 'Volatility Traps & Fakeouts' },
                       { key: 'sessions', label: 'Market Session Opens (London/NY/Asia)' },
+                      { key: 'confluence', label: 'Market Bias Voice Squawks (Chime by default)' },
                       { key: 'guidance', label: 'AI Market Guidance & Regimes' },
                     ].map(({ key, label }) => {
                       const enabled = voiceSettings.enabledEvents[key] !== false;

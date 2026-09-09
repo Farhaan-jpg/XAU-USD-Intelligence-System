@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   pitch: 1.06, // Clear, pleasant natural female pitch
   enabledEvents: {
     news: true,
+    trade_alert: true, // Trade Copilot Setups & Targets
     calendar: true,
     confluence: false, // Disabled by default: prevents repetitive vocal bias chatter, uses subtle chime instead
     divergence: true,
@@ -63,6 +64,17 @@ export function updateVoiceSettings(newSettings) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(cachedSettings));
   } catch (_) {}
   return cachedSettings;
+}
+
+export function toggleVoiceEventChannel(channelKey) {
+  const current = getVoiceSettings();
+  const currentVal = current.enabledEvents[channelKey] !== false;
+  return updateVoiceSettings({
+    enabledEvents: {
+      ...current.enabledEvents,
+      [channelKey]: !currentVal,
+    },
+  });
 }
 
 let isAudioMuted = localStorage.getItem(MUTE_KEY) === 'true';
@@ -577,8 +589,13 @@ export function speakSquawk(message, options = {}) {
   const category = options.category;
 
   // Check if category is enabled in user settings
-  if (category && settings.enabledEvents && settings.enabledEvents[category] === false) {
-    return;
+  if (category && settings.enabledEvents) {
+    if ((category === 'trade_alert' || category === 'copilot') && settings.enabledEvents.trade_alert === false) {
+      return;
+    }
+    if (settings.enabledEvents[category] === false) {
+      return;
+    }
   }
 
   // Deduplication to prevent voice spam
