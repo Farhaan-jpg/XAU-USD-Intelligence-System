@@ -36,11 +36,11 @@ const config = {
   // Polling intervals (ms) — optimized for zero delay and real-time streaming
   intervals: {
     price: 2500,       // 2.5 seconds (ultra responsive tick streaming)
-    news: 15000,       // 15 seconds (zero delay independent feed cycles)
+    news: 8000,        // 8 seconds (fast real-time financial wire refresh)
     calendar: 10000,   // 10 seconds
   },
 
-  // Yahoo Finance symbols
+  // Market proxy symbols
   symbols: {
     XAUUSD: 'GC=F',       // Gold Futures (best XAU/USD proxy)
     XAGUSD: 'SI=F',       // Silver Futures
@@ -51,17 +51,17 @@ const config = {
     OIL: 'CL=F',           // WTI Crude Oil
   },
 
-  // RSS news feed sources
+  // Reputed Institutional Real-Time RSS News Feeds (No Delayed Aggregators like Yahoo Finance)
   rssFeeds: [
-    { name: 'ForexLive', url: 'https://www.forexlive.com/feed/news' },
-    { name: 'FXStreet', url: 'https://www.fxstreet.com/rss/news' },
-    { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
-    { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
-    { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml' },
-    { name: 'Investing.com Commodities', url: 'https://www.investing.com/rss/commodities.rss' },
-    { name: 'Investing.com Gold', url: 'https://www.investing.com/rss/news_25.rss' },
-    { name: 'MarketWatch', url: 'https://feeds.marketwatch.com/marketwatch/topstories/' },
-    { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex' },
+    { name: 'FinancialJuice Wire', url: 'https://www.financialjuice.com/feed.ashx' }, // Real-time institutional financial squawk/breaking wire
+    { name: 'ForexLive Instant', url: 'https://www.forexlive.com/feed/news' },         // Fast FX & central bank breaking news
+    { name: 'FXStreet Live', url: 'https://www.fxstreet.com/rss/news' },               // Institutional Gold & macro coverage
+    { name: 'Reuters Business Wire', url: 'https://feeds.feedburner.com/reuters/businessNews' }, // Global Tier-1 breaking wire
+    { name: 'Investing.com Gold', url: 'https://www.investing.com/rss/news_25.rss' },  // Gold specific spot analysis & flow
+    { name: 'Investing.com Commodities', url: 'https://www.investing.com/rss/commodities.rss' }, // Metals & energy macro
+    { name: 'MarketWatch Top Wire', url: 'https://feeds.marketwatch.com/marketwatch/topstories/' }, // US Treasury & Fed flow
+    { name: 'Al Jazeera Breaking', url: 'https://www.aljazeera.com/xml/rss/all.xml' }, // Geopolitical safe-haven escalations
+    { name: 'BBC World Wire', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },     // Geopolitics & international sanctions
   ],
 
   // Gold-relevance trigger keywords
