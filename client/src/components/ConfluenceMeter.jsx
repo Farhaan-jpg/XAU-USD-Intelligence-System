@@ -54,17 +54,29 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     else if (silverChg < -0.05) techVal -= 25;
     techVal = Math.max(0, Math.min(100, techVal));
 
-    // 4. Economic Calendar Risk Impact (0-100)
-    // If high-impact event is imminent (< 30 min), risk volatility rises
+    // 4. Macro Catalyst & Calendar Event Direction (0-100)
+    // Red-folder events create two-way volatility risk.
+    // When a high-impact event is imminent (< 30m away), directional conviction is neutral (50)
+    // to prevent premature gambling before the numbers drop.
     let eventRiskVal = 50;
+    let imminentEventWarning = null;
     const upcoming = calendarData?.events || calendarData?.upcomingEvents || [];
-    const nextHigh = upcoming.find((e) => e.impact === 'HIGH' && new Date(e.date || e.timeUTC) > new Date());
+    const nextHigh = upcoming.find((e) => e.impact === 'HIGH');
     if (nextHigh) {
-      const diffMins = Math.round((new Date(nextHigh.date || nextHigh.timeUTC).getTime() - Date.now()) / 60000);
-      if (diffMins >= 0 && diffMins <= 30) {
-        eventRiskVal = 80;
-      } else if (diffMins > 30 && diffMins <= 120) {
-        eventRiskVal = 65;
+      const eventTime = new Date(nextHigh.date || nextHigh.timeUTC).getTime();
+      const diffMins = Math.round((eventTime - Date.now()) / 60000);
+
+      // If event recently occurred (past 60m) with reported data:
+      if (diffMins < 0 && diffMins >= -60 && nextHigh.actual && nextHigh.forecast) {
+        const act = parseFloat(nextHigh.actual);
+        const fcast = parseFloat(nextHigh.forecast);
+        if (!isNaN(act) && !isNaN(fcast)) {
+          // Inflation/labor beat = Stronger USD = Gold Bearish (30); Miss = Gold Bullish (70)
+          eventRiskVal = act > fcast ? 30 : 70;
+        }
+      } else if (diffMins >= 0 && diffMins <= 30) {
+        eventRiskVal = 50; // Neutral conviction during pre-news lockup
+        imminentEventWarning = `${nextHigh.title} in ${diffMins}m`;
       }
     }
 
@@ -81,12 +93,18 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     cotVal = Math.max(0, Math.min(100, cotVal));
 
     // Weighted Composite Score (100% total)
-    const composite = Math.round(
-      macroVal * 0.25 +
-      sentimentVal * 0.25 +
-      techVal * 0.20 +
-      cotVal * 0.15 +
-      eventRiskVal * 0.15
+    const composite = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          macroVal * 0.25 +
+          sentimentVal * 0.25 +
+          techVal * 0.20 +
+          cotVal * 0.15 +
+          eventRiskVal * 0.15
+        )
+      )
     );
 
     let verdict = 'NEUTRAL';
@@ -114,6 +132,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       techVal,
       eventRiskVal,
       cotVal,
+      imminentEventWarning,
     };
   }, [prices, newsFeed, calendarData, cotData]);
 
@@ -179,6 +198,27 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
           )}
           <span>{calculation.verdict}</span>
         </div>
+
+        {calculation.imminentEventWarning && (
+          <div
+            style={{
+              margin: '8px 0 0 0',
+              padding: '6px 10px',
+              borderRadius: '4px',
+              background: 'rgba(255, 68, 68, 0.15)',
+              border: '1px solid var(--bear-glow)',
+              color: 'var(--bear-glow)',
+              fontSize: '11px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <ShieldAlert size={14} />
+            <span>RED-FOLDER RISK: {calculation.imminentEventWarning} — REDUCE POSITION SIZE</span>
+          </div>
+        )}
       </div>
 
       {/* Sub-factor Breakdown */}
