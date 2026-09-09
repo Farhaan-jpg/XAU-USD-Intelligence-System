@@ -132,34 +132,42 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     };
   }, [prices, newsFeed, calendarData, cotData]);
 
-  // Voice Alert on Confluence Shift to Extreme Territory
-  const prevVerdictRef = useRef(calculation.verdict);
+  // Voice Alert on Confluence Shift to Extreme Territory (Throttled & Hysteresis Protected)
+  const lastAlertTimeRef = useRef(0);
+  const lastAnnouncedDirectionRef = useRef(null);
+
   useEffect(() => {
-    const prev = prevVerdictRef.current;
-    const current = calculation.verdict;
-    if (prev !== current) {
-      if (current === 'STRONG BUY') {
+    const score = calculation.composite;
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000;
+
+    // Strict Hysteresis: Only trigger on high-conviction structural extremes
+    // (>= 78% for Strong Buy or <= 22% for Strong Sell), spaced at least 10 minutes apart
+    let newDirection = null;
+    if (score >= 78) newDirection = 'STRONG_BUY';
+    else if (score <= 22) newDirection = 'STRONG_SELL';
+
+    if (newDirection && newDirection !== lastAnnouncedDirectionRef.current) {
+      if (now - lastAlertTimeRef.current >= tenMinutes) {
+        lastAlertTimeRef.current = now;
+        lastAnnouncedDirectionRef.current = newDirection;
+
+        const isBull = newDirection === 'STRONG_BUY';
         speakSquawk(
-          `Institutional Bias Alert. Confluence shifted to Strong Buy at ${calculation.composite} percent. Macro and order flow aligned.`,
+          `Institutional Confluence confirmed Strong ${isBull ? 'Bullish' : 'Bearish'} Bias.`,
           {
             category: 'confluence',
             preChime: 'confluence',
-            priority: true,
-          }
-        );
-      } else if (current === 'STRONG SELL') {
-        speakSquawk(
-          `Institutional Bias Alert. Confluence shifted to Strong Sell at ${calculation.composite} percent. Downside pressure accelerating.`,
-          {
-            category: 'confluence',
-            preChime: 'confluence',
-            priority: true,
+            dedupeKey: 'confluence_bias_alert',
+            cooldownSeconds: 600, // 10-minute cooldown
           }
         );
       }
-      prevVerdictRef.current = current;
+    } else if (score >= 35 && score <= 65) {
+      // Reset direction state only when returning well inside the neutral band
+      lastAnnouncedDirectionRef.current = null;
     }
-  }, [calculation.verdict, calculation.composite]);
+  }, [calculation.composite]);
 
   const radius = 54;
   const circumference = 2 * Math.PI * radius;

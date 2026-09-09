@@ -55,10 +55,12 @@ export default function App() {
   useEffect(() => {
     if (latestAlert && latestAlert.impact === 'HIGH') {
       const headline = latestAlert.headline || latestAlert.title || '';
-      const bias = latestAlert.bias ? `Market bias: ${latestAlert.bias.toLowerCase()}.` : '';
-      speakSquawk(`Breaking News Alert. ${headline}. ${bias}`, {
+      if (!headline) return;
+      speakSquawk(`Breaking News: ${headline}`, {
         category: 'news',
         preChime: 'flash',
+        dedupeKey: `news_${latestAlert.id || latestAlert.guid || headline}`,
+        cooldownSeconds: 180,
         priority: true,
       });
     }

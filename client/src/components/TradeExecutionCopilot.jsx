@@ -227,24 +227,31 @@ export default function TradeExecutionCopilot({
     };
   }, [spotPrice, goldHigh, goldLow, gold, dxy, us10y, silver, newsFeed, calendarData, cotData, accountBalance, riskPercent]);
 
-  // Auto squawk when an A+ setup is generated
+  // Auto squawk when an A+ setup is generated (Strict 10-minute cooldown)
   const prevActionRef = useRef(plan.action);
+  const lastAlertTimeRef = useRef(0);
+
   useEffect(() => {
-    if (plan.action !== prevActionRef.current) {
-      if (plan.action === 'BUY' && plan.grade.includes('A+')) {
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000;
+
+    if (plan.action !== prevActionRef.current && (plan.action === 'BUY' || plan.action === 'SELL') && plan.grade.includes('A+')) {
+      if (now - lastAlertTimeRef.current >= tenMinutes) {
+        lastAlertTimeRef.current = now;
         speakSquawk(
-          `Trade Alert. A-plus Institutional Buy setup confirmed on Gold at ${plan.entry.toFixed(2)}. Invalidation stop loss at ${plan.sl.toFixed(2)}. Target one at ${plan.tp1.toFixed(2)}. Win probability: ${plan.winProb} percent.`,
-          { category: 'confluence', preChime: 'confluence', priority: true }
-        );
-      } else if (plan.action === 'SELL' && plan.grade.includes('A+')) {
-        speakSquawk(
-          `Trade Alert. A-plus Institutional Sell setup confirmed on Gold at ${plan.entry.toFixed(2)}. Invalidation stop loss at ${plan.sl.toFixed(2)}. Target one at ${plan.tp1.toFixed(2)}. Win probability: ${plan.winProb} percent.`,
-          { category: 'confluence', preChime: 'confluence', priority: true }
+          `Trade Alert. A-plus Institutional ${plan.action === 'BUY' ? 'Buy' : 'Sell'} setup confirmed on Gold. Win probability: ${plan.winProb} percent.`,
+          {
+            category: 'confluence',
+            preChime: 'confluence',
+            dedupeKey: 'copilot_trade_alert',
+            cooldownSeconds: 600,
+            priority: true,
+          }
         );
       }
       prevActionRef.current = plan.action;
     }
-  }, [plan.action, plan.grade, plan.entry, plan.sl, plan.tp1, plan.winProb]);
+  }, [plan.action, plan.grade]);
 
   // Manual Voice Squawk of Trade Plan
   const handleSquawkTradePlan = () => {

@@ -478,7 +478,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                     {[
                       { key: 'news', label: 'High-Impact Breaking News' },
                       { key: 'calendar', label: 'Economic Calendar (T-5m & Releases)' },
-                      { key: 'confluence', label: 'Confluence Bias Shifts (Strong Buy/Sell)' },
+                      { key: 'confluence', label: 'Market Bias Voice Squawks (Chime by default)' },
                       { key: 'divergence', label: 'Macro Intermarket Divergences' },
                       { key: 'liquidity', label: 'Smart Liquidity Sweeps (BSL/SSL)' },
                       { key: 'volatility', label: 'Volatility Traps & Fakeouts' },

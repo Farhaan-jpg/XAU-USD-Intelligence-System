@@ -13,12 +13,12 @@ const DEFAULT_SETTINGS = {
   enabledEvents: {
     news: true,
     calendar: true,
-    confluence: true,
+    confluence: false, // Disabled by default: prevents repetitive vocal bias chatter, uses subtle chime instead
     divergence: true,
     liquidity: true,
     volatility: true,
     sessions: true,
-    guidance: true,
+    guidance: false,
   },
 };
 
@@ -29,6 +29,14 @@ export function getVoiceSettings() {
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
       cachedSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+
+      // Migration v2: Silence repetitive market bias voice alerts by default unless explicitly re-enabled
+      if (localStorage.getItem('xau_bias_quiet_v2') !== 'migrated') {
+        cachedSettings.enabledEvents.confluence = false;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(cachedSettings));
+        localStorage.setItem('xau_bias_quiet_v2', 'migrated');
+      }
+
       // Ensure nested enabledEvents has all keys
       cachedSettings.enabledEvents = {
         ...DEFAULT_SETTINGS.enabledEvents,
@@ -548,7 +556,7 @@ export function speakSquawk(message, options = {}) {
   // Deduplication to prevent voice spam
   const cooldown = (options.cooldownSeconds || 25) * 1000;
   const now = Date.now();
-  const cacheKey = `${category || 'general'}_${message.trim().toLowerCase()}`;
+  const cacheKey = options.dedupeKey || `${category || 'general'}_${message.trim().toLowerCase()}`;
   const lastSpoken = lastSpokenMap.get(cacheKey);
 
   if (lastSpoken && now - lastSpoken < cooldown) {
