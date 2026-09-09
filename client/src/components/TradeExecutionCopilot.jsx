@@ -243,6 +243,40 @@ export default function TradeExecutionCopilot({
     }
   }, [liveScan.action, lockedDecision]);
 
+  // Automated voice squawk when a trade setup locks in (Both Bullish & Bearish)
+  const announcedLockRef = useRef(null);
+  useEffect(() => {
+    if (lockedDecision && lockedDecision.id !== announcedLockRef.current) {
+      announcedLockRef.current = lockedDecision.id;
+      const isSell = lockedDecision.action === 'SELL';
+      const isBuy = lockedDecision.action === 'BUY';
+
+      if (isSell) {
+        speakSquawk(
+          `Trade Alert. Institutional Bearish Sell setup confirmed on Gold. Entry at ${lockedDecision.entry.toFixed(2)} dollars. Invalidation stop loss at ${lockedDecision.sl.toFixed(2)}. Target one at ${lockedDecision.tp1.toFixed(2)}. Win probability: ${lockedDecision.winProb} percent.`,
+          {
+            category: 'confluence',
+            preChime: 'bearish',
+            dedupeKey: `copilot_sell_${lockedDecision.id}`,
+            priority: true,
+            cooldownSeconds: 300,
+          }
+        );
+      } else if (isBuy) {
+        speakSquawk(
+          `Trade Alert. Institutional Bullish Buy setup confirmed on Gold. Entry at ${lockedDecision.entry.toFixed(2)} dollars. Invalidation stop loss at ${lockedDecision.sl.toFixed(2)}. Target one at ${lockedDecision.tp1.toFixed(2)}. Win probability: ${lockedDecision.winProb} percent.`,
+          {
+            category: 'confluence',
+            preChime: 'confluence',
+            dedupeKey: `copilot_buy_${lockedDecision.id}`,
+            priority: true,
+            cooldownSeconds: 300,
+          }
+        );
+      }
+    }
+  }, [lockedDecision]);
+
   // Unlocks / resets the locked decision
   const handleUnlockDecision = () => {
     setLockedDecision(null);
@@ -353,6 +387,37 @@ export default function TradeExecutionCopilot({
     profitTargetPct,
     newsLockupMins,
   ]);
+
+  // Announce trade milestones (TP1, TP2, Stop Loss)
+  const lastAnnouncedStatusRef = useRef('ACTIVE SETUP');
+  useEffect(() => {
+    if (activePlan.isLocked && activePlan.liveStatus !== lastAnnouncedStatusRef.current) {
+      const status = activePlan.liveStatus;
+      lastAnnouncedStatusRef.current = status;
+      if (status.includes('TARGET 1')) {
+        speakSquawk(`Trade update. Target one achieved at ${activePlan.tp1.toFixed(2)} dollars. Secure partial profits.`, {
+          category: 'confluence',
+          preChime: 'confluence',
+          priority: true,
+          cooldownSeconds: 60,
+        });
+      } else if (status.includes('TARGET 2')) {
+        speakSquawk(`Trade update. Final runner target achieved at ${activePlan.tp2.toFixed(2)} dollars. Trade fully closed.`, {
+          category: 'confluence',
+          preChime: 'confluence',
+          priority: true,
+          cooldownSeconds: 60,
+        });
+      } else if (status.includes('STOPPED OUT')) {
+        speakSquawk(`Trade alert. Stop loss reached at ${activePlan.sl.toFixed(2)} dollars. Setup invalidated under capital defense rules.`, {
+          category: 'confluence',
+          preChime: 'bearish',
+          priority: true,
+          cooldownSeconds: 60,
+        });
+      }
+    }
+  }, [activePlan.isLocked, activePlan.liveStatus, activePlan.tp1, activePlan.tp2, activePlan.sl]);
 
   // Voice Squawk
   const handleSquawkTradePlan = () => {

@@ -66,9 +66,10 @@ export default function MacroRadar({ prices = {} }) {
   // Audio trigger on new divergence
   useEffect(() => {
     if (divergence) {
-      speakSquawk(`Macro Alert. ${divergence.title}. ${divergence.desc}`, {
+      const isBearish = divergence.type === 'BEARISH_DIVERGENCE';
+      speakSquawk(`Macro ${isBearish ? 'Bearish' : 'Bullish'} Alert. ${divergence.title}. ${divergence.desc}`, {
         category: 'divergence',
-        preChime: 'divergence',
+        preChime: isBearish ? 'bearish' : 'divergence',
         priority: true,
       });
     }

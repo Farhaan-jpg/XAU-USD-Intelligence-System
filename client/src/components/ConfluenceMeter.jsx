@@ -227,11 +227,11 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
 
         const isBull = newDirection === 'STRONG_BUY';
         speakSquawk(
-          `Institutional Confluence confirmed Strong ${isBull ? 'Bullish' : 'Bearish'} Bias.`,
+          `Institutional Confluence confirmed Strong ${isBull ? 'Bullish' : 'Bearish'} Bias on Gold. ${isBull ? 'Buyers dominating order flow.' : 'Sellers dominating order flow.'}`,
           {
             category: 'confluence',
-            preChime: 'confluence',
-            dedupeKey: 'confluence_bias_alert',
+            preChime: isBull ? 'confluence' : 'bearish',
+            dedupeKey: `confluence_bias_${newDirection}`,
             cooldownSeconds: 600, // 10-minute cooldown
           }
         );

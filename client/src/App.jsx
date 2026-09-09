@@ -54,9 +54,17 @@ export default function App() {
     if (latestAlert && latestAlert.impact === 'HIGH') {
       const headline = latestAlert.headline || latestAlert.title || '';
       if (!headline) return;
-      speakSquawk(`Breaking News: ${headline}`, {
+      const isBearish = latestAlert.bias === 'BEARISH';
+      const isBullish = latestAlert.bias === 'BULLISH';
+      const prefix = isBearish
+        ? 'Bearish News Alert for Gold'
+        : isBullish
+        ? 'Bullish News Alert for Gold'
+        : 'Breaking News Alert';
+
+      speakSquawk(`${prefix}: ${headline}. ${isBearish ? 'Downside pressure expected.' : isBullish ? 'Upside catalyst active.' : ''}`, {
         category: 'news',
-        preChime: 'flash',
+        preChime: isBearish ? 'bearish' : 'flash',
         dedupeKey: `news_${latestAlert.id || latestAlert.guid || headline}`,
         cooldownSeconds: 180,
         priority: true,

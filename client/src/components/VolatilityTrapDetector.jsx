@@ -49,11 +49,12 @@ export default function VolatilityTrapDetector({ prices = {}, calendarData = {} 
   // Voice Alert on rapid volatility expansion
   useEffect(() => {
     if (trapAlert) {
+      const isBear = trapAlert.title.toLowerCase().includes('dump') || trapAlert.title.toLowerCase().includes('bear');
       speakSquawk(
-        `Volatility Alert. ${trapAlert.title}. Velocity of ${trapAlert.delta} dollars in under sixty seconds. Beware of fakeout.`,
+        `Volatility ${isBear ? 'Bearish' : 'Bullish'} Alert. ${trapAlert.title}. Velocity of ${trapAlert.delta} dollars in under sixty seconds. ${isBear ? 'Rapid downside sell pressure.' : 'Beware of fakeout.'}`,
         {
           category: 'volatility',
-          preChime: 'trap',
+          preChime: isBear ? 'bearish' : 'trap',
           priority: true,
         }
       );

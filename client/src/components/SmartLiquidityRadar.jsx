@@ -76,7 +76,7 @@ export default function SmartLiquidityRadar({ prices = {} }) {
         `Liquidity Alert. Sell-side liquidity swept below equal lows at ${spotPrice.toFixed(2)} dollars. Retail stop run underway.`,
         {
           category: 'liquidity',
-          preChime: 'liquidity',
+          preChime: 'bearish',
           priority: true,
         }
       );

@@ -264,6 +264,34 @@ export function playTrapAlert() {
 }
 
 /**
+ * Bearish Alert (Institutional Descending Warning Chime: 587Hz -> 370Hz)
+ */
+export function playBearishAlert() {
+  if (isAudioMuted) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, now); // D5
+    osc.frequency.exponentialRampToValueAtTime(369.99, now + 0.22); // F#4
+
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.38);
+  } catch (_) {}
+}
+
+/**
  * Session Transition Alert (Tri-tone Chime)
  */
 export function playSessionAlert() {
@@ -587,6 +615,7 @@ export function speakSquawk(message, options = {}) {
     else if (preChime === 'liquidity') playLiquiditySweepAlert();
     else if (preChime === 'trap') playTrapAlert();
     else if (preChime === 'session') playSessionAlert();
+    else if (preChime === 'bearish') playBearishAlert();
   }
 
   setTimeout(() => {
