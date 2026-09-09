@@ -72,7 +72,6 @@ export default function Header({
 
   const channels = [
     { key: 'news', label: 'Breaking News Alerts', icon: '📢' },
-    { key: 'trade_alert', label: 'Trade Copilot (Buy/Sell & Targets)', icon: '🎯' },
     { key: 'calendar', label: 'Economic Calendar Warnings', icon: '📅' },
     { key: 'divergence', label: 'Macro Dollar / Yield Divergence', icon: '⚡' },
     { key: 'liquidity', label: 'Liquidity Sweeps (BSL/SSL)', icon: '🌊' },

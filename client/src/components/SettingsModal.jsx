@@ -477,7 +477,6 @@ export default function SettingsModal({ isOpen, onClose }) {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
                     {[
                       { key: 'news', label: 'High-Impact Breaking News' },
-                      { key: 'trade_alert', label: 'Trade Copilot Execution (Buy/Sell & Targets)' },
                       { key: 'calendar', label: 'Economic Calendar (T-5m & Releases)' },
                       { key: 'divergence', label: 'Macro Intermarket Divergences' },
                       { key: 'liquidity', label: 'Smart Liquidity Sweeps (BSL/SSL)' },

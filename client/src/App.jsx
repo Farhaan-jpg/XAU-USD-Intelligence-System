@@ -16,7 +16,6 @@ import StatusBar from './components/StatusBar';
 import SmartLiquidityRadar from './components/SmartLiquidityRadar';
 import VolatilityTrapDetector from './components/VolatilityTrapDetector';
 import COTSentimentGauge from './components/COTSentimentGauge';
-import TradeExecutionCopilot from './components/TradeExecutionCopilot';
 import { playFlashAlert, playEventWarning, speakSquawk } from './utils/audioAlerts';
 import {
   LayoutDashboard,
@@ -27,7 +26,6 @@ import {
   AlertTriangle,
   Target,
   Award,
-  Crosshair,
 } from 'lucide-react';
 
 export default function App() {
@@ -157,17 +155,6 @@ export default function App() {
         </button>
 
         <button
-          className={`tab-btn ${activeTab === 'COPILOT' ? 'active' : ''}`}
-          onClick={() => setActiveTab('COPILOT')}
-        >
-          <Crosshair size={15} style={{ color: 'var(--gold-glow)' }} />
-          <span>TRADE COPILOT</span>
-          <span className="tab-pill" style={{ background: 'var(--gold-bg)', color: 'var(--gold-glow)', borderColor: 'var(--border-gold)' }}>
-            A+ SETUPS
-          </span>
-        </button>
-
-        <button
           className={`tab-btn ${activeTab === 'GUIDANCE' ? 'active' : ''}`}
           onClick={() => setActiveTab('GUIDANCE')}
         >
@@ -249,14 +236,6 @@ export default function App() {
             {/* Post-News Volatility Trap Detector */}
             <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
 
-            {/* Institutional Trade Execution Copilot (A+ Setup Engine & Custom Risk Suite) */}
-            <TradeExecutionCopilot
-              prices={prices}
-              newsFeed={newsFeed}
-              calendarData={calendarData}
-              cotData={cotData}
-            />
-
             {/* Top Grid: TradingView Chart & Confluence Bias Meter + Smart Liquidity */}
             <div className="grid-terminal-top">
               <TradingChart prices={prices} />
@@ -283,24 +262,7 @@ export default function App() {
           </>
         )}
 
-        {/* Dedicated Tab: Trade Execution Copilot View */}
-        {activeTab === 'COPILOT' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <TradeExecutionCopilot
-              prices={prices}
-              newsFeed={newsFeed}
-              calendarData={calendarData}
-              cotData={cotData}
-            />
-            <div className="grid-terminal-top">
-              <TradingChart prices={prices} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
-                <SmartLiquidityRadar prices={prices} />
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Tab 2: AI Market Guidance Focus */}
         {activeTab === 'GUIDANCE' && (
