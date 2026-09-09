@@ -29,7 +29,12 @@ async function sendNewsAlert(newsItem) {
     return;
   }
 
-  const { headline, bias, reasoning, source, impact, scoredAt } = newsItem;
+  const headline = newsItem.headline || newsItem.title || 'Breaking News';
+  const bias = newsItem.bias || 'NEUTRAL';
+  const reasoning = newsItem.reasoning || newsItem.summary || 'Macro impact evaluation in progress.';
+  const source = newsItem.source || 'Wire';
+  const impact = newsItem.impact || 'MED';
+  const scoredAt = newsItem.scoredAt || newsItem.publishedAt || new Date().toISOString();
 
   const biasEmoji = bias === 'BULLISH' ? '🟢' : bias === 'BEARISH' ? '🔴' : '⚪';
   const impactEmoji = impact === 'HIGH' ? '⚡' : impact === 'MED' ? '⚠️' : 'ℹ️';
