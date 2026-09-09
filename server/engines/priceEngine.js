@@ -65,7 +65,6 @@ class TVStreamer {
     this.sessionId = 'qs_' + Math.random().toString(36).substring(2, 10);
     this.reconnectTimer = null;
     this.isClosed = false;
-    this.bars = { '1': [], '5': [], '15': [], '60': [], '240': [], 'D': [] };
     this.intervalChanges = {};
     this.connect();
   }
@@ -88,23 +87,14 @@ class TVStreamer {
       });
 
       this.ws.on('open', () => {
-        console.log('[TV-STREAM] Connected to live TradingView quote & chart stream');
+        console.log('[TV-STREAM] Connected to live TradingView quote stream for all assets');
         this.send('set_auth_token', ['unauthorized_user_token']);
         this.send('quote_create_session', [this.sessionId]);
         this.send('quote_set_fields', [
           this.sessionId,
-          'lp', 'bid', 'ask', 'ch', 'chp', 'high_price', 'low_price', 'open_price', 'volume'
+          'lp', 'bid', 'ask', 'ch', 'chp', 'high_price', 'low_price', 'open_price', 'volume', 'prev_close_price'
         ]);
         this.send('quote_add_symbols', [this.sessionId, ...this.symbols]);
-
-        // Subscribe to live candlestick series for all workstation chart timeframes
-        const intervals = ['1', '5', '15', '60', '240', 'D'];
-        intervals.forEach((itv) => {
-          const csId = 'cs_' + itv;
-          this.send('chart_create_session', [csId, '']);
-          this.send('resolve_symbol', [csId, `sym_${itv}`, '={"symbol":"OANDA:XAUUSD","adjustment":"splits"}']);
-          this.send('create_series', [csId, `sds_${itv}`, 's1', `sym_${itv}`, itv, 3, '']);
-        });
       });
 
       this.ws.on('message', (data) => {
@@ -121,24 +111,14 @@ class TVStreamer {
               const sym = parsed.p[1].n;
               const v = parsed.p[1].v;
               this.handleTick(sym, v);
-            } else if (parsed.m === 'timescale_update' || parsed.m === 'du') {
-              const cs = parsed.p && parsed.p[0];
-              if (cs && cs.startsWith('cs_')) {
-                const itv = cs.replace('cs_', '');
-                const payload = parsed.p[1];
-                const s = payload && payload[`sds_${itv}`]?.s;
-                if (s && s.length > 0) {
-                  this.handleBarUpdate(itv, s, parsed.m === 'du');
-                }
-              }
             }
           } catch (_) {}
         }
       });
 
-      this.ws.on('close', () => {
+      this.ws.on('close', (code, reason) => {
         if (!this.isClosed) {
-          console.log('[TV-STREAM] Stream closed, reconnecting in 2s...');
+          console.log(`[TV-STREAM] Stream closed (code ${code}), reconnecting in 2s...`);
           this.reconnectTimer = setTimeout(() => this.connect(), 2000);
         }
       });
@@ -151,53 +131,6 @@ class TVStreamer {
       this.reconnectTimer = setTimeout(() => this.connect(), 3000);
     }
   }
-
-  handleBarUpdate(itv, s, isDu) {
-    if (!this.bars[itv]) this.bars[itv] = [];
-
-    if (isDu) {
-      for (const barItem of s) {
-        const lastIdx = this.bars[itv].length - 1;
-        if (lastIdx >= 0 && this.bars[itv][lastIdx].i === barItem.i) {
-          this.bars[itv][lastIdx] = barItem;
-        } else {
-          this.bars[itv].push(barItem);
-        }
-      }
-    } else {
-      this.bars[itv] = s;
-    }
-
-    const bars = this.bars[itv];
-    if (!bars || bars.length === 0) return;
-
-    const currentBar = bars[bars.length - 1].v;
-    const prevBar = bars.length > 1 ? bars[bars.length - 2].v : null;
-    const prevClose = prevBar ? prevBar[4] : currentBar[1];
-    const lastClose = currentBar[4];
-    const ch = lastClose - prevClose;
-    const chp = prevClose > 0 ? (ch / prevClose) * 100 : 0;
-
-    this.intervalChanges[itv] = {
-      ch: parseFloat(ch.toFixed(3)),
-      chp: parseFloat(chp.toFixed(2)),
-      open: currentBar[1],
-      high: currentBar[2],
-      low: currentBar[3],
-      close: lastClose,
-      prevClose,
-    };
-
-    if (latestPrices['GC=F']) {
-      latestPrices['GC=F'].intervals = { ...this.intervalChanges };
-      if (itv === '5') {
-        latestPrices['GC=F'].change5m = parseFloat(chp.toFixed(4));
-      }
-      latestPrices['XAUUSD'] = latestPrices['GC=F'];
-      scheduleBroadcast();
-    }
-  }
-
   handleTick(sym, v) {
     if (!v) return;
     lastWsTickTime = Date.now();
@@ -218,24 +151,38 @@ class TVStreamer {
       const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
       const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(2)) : (existing.changeAbs || 0);
 
-      // Dynamically update active interval bar estimates with latest spot tick
-      for (const itv of Object.keys(this.intervalChanges)) {
-        const item = this.intervalChanges[itv];
-        if (item && item.prevClose) {
-          const tickCh = newPrice - item.prevClose;
-          const tickChp = (tickCh / item.prevClose) * 100;
-          item.ch = parseFloat(tickCh.toFixed(3));
-          item.chp = parseFloat(tickChp.toFixed(2));
-          item.close = newPrice;
-          item.high = Math.max(item.high || newPrice, newPrice);
-          item.low = Math.min(item.low || newPrice, newPrice);
-        }
-      }
-
       // Buffer
       if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
       priceHistory['GC=F'].push({ price: newPrice, ts: Date.now() });
       if (priceHistory['GC=F'].length > BUFFER_SIZE) priceHistory['GC=F'].shift();
+
+      // Compute rolling interval changes from price history
+      const now = Date.now();
+      const getChangeSince = (msAgo) => {
+        const targetTs = now - msAgo;
+        const entry = priceHistory['GC=F'].find((p) => p.ts >= targetTs) || priceHistory['GC=F'][0];
+        if (!entry || !entry.price) return { ch: 0, chp: 0, open: newPrice, close: newPrice, high, low };
+        const diff = newPrice - entry.price;
+        const pct = entry.price > 0 ? (diff / entry.price) * 100 : 0;
+        return {
+          ch: parseFloat(diff.toFixed(2)),
+          chp: parseFloat(pct.toFixed(2)),
+          open: entry.price,
+          close: newPrice,
+          high,
+          low,
+        };
+      };
+
+      this.intervalChanges = {
+        '1': getChangeSince(60 * 1000),
+        '5': getChangeSince(5 * 60 * 1000),
+        '15': getChangeSince(15 * 60 * 1000),
+        '60': getChangeSince(60 * 60 * 1000),
+        '240': getChangeSince(240 * 60 * 1000),
+        'D': { ch, chp, open, high, low, close: newPrice },
+      };
+
       const oldest = priceHistory['GC=F'][0]?.price;
       const change5m = oldest ? ((newPrice - oldest) / oldest) * 100 : 0;
 

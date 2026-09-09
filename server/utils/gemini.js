@@ -17,15 +17,13 @@ const MAX_FAILURES_BEFORE_COOLDOWN = 6;
 let cooldownUntil = 0;
 
 const PREFERRED_MODEL_ORDER = [
-  'gemini-3.6-flash',
-  'gemini-3.7-flash',
-  'gemini-flash-latest',
-  'gemini-3.5-flash',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3-flash-preview',
   'gemini-flash-lite-latest',
   'gemma-4-26b-a4b-it',
-  'gemini-3.8-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
 ];
 
 /**
@@ -94,7 +92,7 @@ async function discoverModels(force = false) {
  * Get current operational model
  */
 function getActiveModel() {
-  if (availableModels.length === 0) return 'gemini-3.6-flash';
+  if (availableModels.length === 0) return 'gemini-flash-lite-latest';
   return availableModels[activeModelIndex % availableModels.length];
 }
 
@@ -124,7 +122,7 @@ async function scoreWithGemini(headline, summary, source) {
     await discoverModels();
   }
 
-  const prompt = `You are a quantitative gold (XAU/USD) trading analyst at an institutional hedge fund.
+  const prompt = `You are a quantitative gold (XAU/USD) trading analyst.
 Analyze this news item for its direct impact on Gold price (XAU/USD), US Dollar (DXY), and Treasury yields.
 
 Source: ${source}
@@ -132,16 +130,11 @@ Headline: ${headline}
 Summary: ${summary || '(no summary available)'}
 
 OUTPUT RULES:
-- Output ONLY valid JSON, no surrounding markdown codeblocks, no explanations outside JSON.
-- impact: "HIGH" (FOMC, NFP, CPI, PCE, geopolitical war/missile escalation, central bank policy surprise), "MED" (treasury yields move, GDP, PMI, dollar fluctuations), or "LOW" (routine commentary, noise).
-- bias: "BULLISH" (drives gold price higher), "BEARISH" (drives gold price lower), or "NEUTRAL" (no clear directional edge).
-- reasoning: exactly 1 crisp, highly technical sentence explaining the market transmission mechanism.
-
-JSON Structure:
+- Output valid JSON ONLY:
 {
   "impact": "HIGH" | "MED" | "LOW",
   "bias": "BULLISH" | "BEARISH" | "NEUTRAL",
-  "reasoning": "string"
+  "reasoning": "crisp 1-sentence explanation"
 }`;
 
   // Try up to 3 candidate models in our pool
@@ -155,13 +148,13 @@ JSON Structure:
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.1,
-          maxOutputTokens: 250,
+          maxOutputTokens: 200,
         },
       };
 
       const res = await axios.post(url, payload, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 6500,
+        timeout: 5000,
       });
 
       const candidateText = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -169,9 +162,15 @@ JSON Structure:
 
       // Strip potential markdown codefence if present
       const cleaned = candidateText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
+      let parsed;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (_) {
+        const m = cleaned.match(/\{[\s\S]*?\}/);
+        if (m) parsed = JSON.parse(m[0]);
+      }
 
-      if (!parsed.impact || !parsed.bias || !parsed.reasoning) {
+      if (!parsed || !parsed.bias) {
         throw new Error('Incomplete JSON schema returned');
       }
 
@@ -180,25 +179,21 @@ JSON Structure:
         headline,
         impact: ['HIGH', 'MED', 'LOW'].includes(parsed.impact) ? parsed.impact : 'LOW',
         bias: ['BULLISH', 'BEARISH', 'NEUTRAL'].includes(parsed.bias) ? parsed.bias : 'NEUTRAL',
-        reasoning: parsed.reasoning,
+        reasoning: parsed.reasoning || '',
         model: `gemini/${currentModel}`,
         provider: 'Google Gemini',
         scoredAt: new Date().toISOString(),
       };
     } catch (err) {
       const status = err.response?.status;
-      console.warn(`[GEMINI] Attempt with ${currentModel} failed (${status || err.code}): ${err.message}`);
-
-      // Rotate model on rate limit or model not found
-      if (status === 429 || status === 404 || status === 400) {
+      if (status === 429 || status === 404 || status === 400 || status === 503) {
         rotateToNextModel();
       }
 
       if (attempt === maxAttempts - 1) {
         consecutiveFailures++;
         if (consecutiveFailures >= MAX_FAILURES_BEFORE_COOLDOWN) {
-          cooldownUntil = Date.now() + 60 * 1000; // 1 min cooldown before trying Google again
-          console.warn('[GEMINI] Entering 60s cooldown; handing off to OpenRouter.');
+          cooldownUntil = Date.now() + 60 * 1000;
         }
         throw err;
       }
@@ -209,49 +204,31 @@ JSON Structure:
 }
 
 /**
- * Generate AI Trade Setup & Playbook based on real-time market confluence
+ * Generate AI Market Guidance & Volatility Warnings (NO TRADE SETUPS)
  */
-async function generateTradeCopilot(marketData) {
+async function generateMarketGuidance(marketData) {
   const apiKey = config.google?.apiKey;
   if (!apiKey) throw new Error('Missing GOOGLE_API_KEY');
 
   const currentModel = getActiveModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
 
-  const prompt = `You are the Lead Quantitative Gold Trader for a proprietary trading desk.
-Analyze the following real-time institutional gold telemetry:
-
-Gold Spot (XAU/USD): $${marketData.goldPrice || 'N/A'}
-Gold 5-Min Velocity: ${marketData.goldChange5m || 0}%
-DXY Dollar Index: ${marketData.dxyPrice || 'N/A'} (5m chg: ${marketData.dxyChange5m || 0}%)
+  const prompt = `You are an institutional macro risk manager for XAU/USD gold trading desk.
+Analyze this real-time telemetry:
+Gold Spot: $${marketData.goldPrice || 'N/A'} (5m velocity: ${marketData.goldChange5m || 0}%)
+DXY: ${marketData.dxyPrice || 'N/A'} (5m chg: ${marketData.dxyChange5m || 0}%)
 US 10Y Yield: ${marketData.us10yPrice || 'N/A'}%
-Silver (XAG/USD): $${marketData.silverPrice || 'N/A'}
-Gold-Silver Ratio (GSR): ${marketData.gsr || 'N/A'}
-Active Session: ${marketData.activeSession || 'N/A'}
-Key Recent News Headlines:
-${(marketData.recentHeadlines || []).slice(0, 4).map((h, i) => `${i + 1}. ${h}`).join('\n') || 'None'}
-Upcoming Red-Folder Event: ${marketData.nextEvent?.title || 'None in immediate window'} in ${marketData.nextEvent?.minsUntil || 'N/A'} mins
+Session: ${marketData.activeSession || 'N/A'}
+Next Event: ${marketData.nextEvent?.title || 'None imminent'} in ${marketData.nextEvent?.minsUntil || 'N/A'}m
 
-TASK:
-Produce an actionable, institutional-grade trade setup and scenario playbook.
-Output ONLY valid JSON.
-
-JSON Structure:
+DO NOT provide trade setups, entries, stop losses, or price targets.
+Output JSON ONLY:
 {
-  "bias": "STRONG_BUY" | "BUY" | "NEUTRAL" | "SELL" | "STRONG_SELL",
-  "confidence": number (50-98),
-  "strategy": "string (e.g., Asian Liquidity Sweep & London Expansion)",
-  "entryZone": "string (e.g., $2342.50 - $2345.00)",
-  "stopLoss": "string (e.g., $2337.80)",
-  "target1": "string (e.g., $2354.00)",
-  "target2": "string (e.g., $2366.50)",
-  "riskReward": "string (e.g., 1:2.8)",
-  "invalidation": "string (one concise condition that voids this setup)",
-  "macroThesis": "string (two concise sentences summarizing yield/dollar/sentiment confluence)",
-  "scenarioPlaybook": {
-    "bullTrigger": "string",
-    "bearTrigger": "string"
-  }
+  "regime": "ACCUMULATION" | "EXPANSION" | "COMPRESSION" | "DISTRIBUTION",
+  "riskLevel": "LOW" | "ELEVATED" | "CRITICAL",
+  "guidance": "2 concise sentences explaining macro price driver and market posture.",
+  "warnings": ["Warning 1", "Warning 2"],
+  "watchpoints": ["Watchpoint 1", "Watchpoint 2"]
 }`;
 
   const res = await axios.post(url, {
@@ -259,22 +236,33 @@ JSON Structure:
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.15,
-      maxOutputTokens: 500,
+      maxOutputTokens: 300,
     },
   }, {
     headers: { 'Content-Type': 'application/json' },
-    timeout: 9000,
+    timeout: 6000,
   });
 
   const raw = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
   const cleaned = (raw || '').replace(/```json/gi, '').replace(/```/g, '').trim();
-  const parsed = JSON.parse(cleaned);
-  return {
-    ...parsed,
-    model: `gemini/${currentModel}`,
-    provider: 'Google Gemini',
-    generatedAt: new Date().toISOString(),
-  };
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (_) {
+    const m = cleaned.match(/\{[\s\S]*?\}/);
+    if (m) parsed = JSON.parse(m[0]);
+  }
+
+  if (parsed && parsed.guidance) {
+    return {
+      ...parsed,
+      model: `gemini/${currentModel}`,
+      provider: 'Google Gemini',
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  throw new Error('Could not parse market guidance JSON');
 }
 
 /**
@@ -309,7 +297,7 @@ function updateConfig({ apiKey, model }) {
 module.exports = {
   discoverModels,
   scoreWithGemini,
-  generateTradeCopilot,
+  generateMarketGuidance,
   getStatus,
   updateConfig,
 };

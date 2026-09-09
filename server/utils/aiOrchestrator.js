@@ -62,13 +62,14 @@ async function scoreNewsItem(headline, summary, source) {
  * Generate AI Market Guidance & Volatility Warnings (No trade setups)
  */
 async function getMarketGuidance(marketData) {
-  // Try OpenRouter free models or Google Gemini for market guidance
+  // Priority 1: Google Gemini (direct, high token quota, fast)
   try {
-    return await openrouter.generateMarketGuidance(marketData);
-  } catch (err) {
-    console.warn(`[AI-ORCHESTRATOR] Market guidance fallback: ${err.message}`);
-    return await openrouter.generateMarketGuidance(marketData);
-  }
+    const result = await gemini.generateMarketGuidance(marketData);
+    if (result && result.guidance) return result;
+  } catch (_) {}
+
+  // Priority 2: OpenRouter free models / Algorithmic fallback
+  return await openrouter.generateMarketGuidance(marketData);
 }
 
 /**

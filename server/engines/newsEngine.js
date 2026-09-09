@@ -98,9 +98,33 @@ function processItemInstantly(rawItem) {
   latestNews.unshift(newsItem);
   if (latestNews.length > MAX_NEWS) latestNews = latestNews.slice(0, MAX_NEWS);
 
-  // 3. ASYNCHRONOUS PURE AI MODEL EVALUATION (OpenRouter Free Models & Gemini)
-  aiOrchestrator.scoreNewsItem(rawItem.title, rawItem.summary, rawItem.source)
-    .then((aiSentiment) => {
+  // 3. ENQUEUE FOR SERIALIZED ASYNCHRONOUS AI SCORING (PREVENTS RATE-LIMIT BURSTS)
+  enqueueForScoring(newsItem, rawItem);
+
+  return newsItem;
+}
+
+// Resilient Serialized AI Scoring Queue
+const scoringQueue = [];
+let isQueueProcessing = false;
+
+function enqueueForScoring(newsItem, rawItem) {
+  // Prune backlog if > 15 items to prevent token burn & latency build-up
+  if (scoringQueue.length >= 15) {
+    scoringQueue.shift();
+  }
+  scoringQueue.push({ newsItem, rawItem });
+  processScoringQueue();
+}
+
+async function processScoringQueue() {
+  if (isQueueProcessing || scoringQueue.length === 0) return;
+  isQueueProcessing = true;
+
+  while (scoringQueue.length > 0) {
+    const { newsItem, rawItem } = scoringQueue.shift();
+    try {
+      const aiSentiment = await aiOrchestrator.scoreNewsItem(rawItem.title, rawItem.summary, rawItem.source);
       if (aiSentiment && aiSentiment.bias) {
         newsItem.reasoning = aiSentiment.reasoning || newsItem.reasoning;
         newsItem.impact = aiSentiment.impact || newsItem.impact;
@@ -120,10 +144,13 @@ function processItemInstantly(rawItem) {
           );
         }
       }
-    })
-    .catch(() => {});
+    } catch (_) {}
 
-  return newsItem;
+    // 250ms spacing between AI calls to prevent 429 rate-limit spikes
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  isQueueProcessing = false;
 }
 
 /**

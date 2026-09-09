@@ -78,9 +78,9 @@ async function scoreNewsItem(headline, summary, source) {
   // Free auto-fallback model chain
   const freeModels = [
     config.openrouter.model || 'openrouter/free',
-    'liquid/lfm-2.5-2.6b:free',
+    'google/gemma-4-26b-a4b-it:free',
     'nvidia/nemotron-3.5-lightning:free',
-    'inclusionai/ling-3.0-flash-fin:free',
+    'liquid/lfm-2.5-2.6b:free',
     config.openrouter.fallbackModel || 'nex-agi/nex-n2.5-mini:free',
   ];
 
@@ -88,15 +88,12 @@ async function scoreNewsItem(headline, summary, source) {
     try {
       const res = await client.post('/chat/completions', {
         model,
-        models: freeModels,
-        route: 'fallback',
         messages: [
           { role: 'system', content: SENTIMENT_SYSTEM_PROMPT },
           { role: 'user', content: promptInput },
         ],
         temperature: 0.1,
-        max_tokens: 60, // strictly capped token limit
-        response_format: { type: 'json_object' },
+        max_tokens: 80, // strictly capped token limit
       });
 
       const raw = res.data.choices?.[0]?.message?.content;
@@ -104,11 +101,9 @@ async function scoreNewsItem(headline, summary, source) {
 
       let parsed;
       try {
-        parsed = JSON.parse(raw);
-      } catch (_) {
-        const match = raw.match(/\{[\s\S]*\}/);
+        const match = raw.match(/\{[\s\S]*?\}/);
         if (match) parsed = JSON.parse(match[0]);
-      }
+      } catch (_) {}
 
       if (parsed && parsed.bias) {
         recordSuccess();
@@ -131,8 +126,9 @@ async function scoreNewsItem(headline, summary, source) {
       }
     } catch (err) {
       const status = err.response?.status;
-      if (status === 402 || status === 429) {
+      if (status === 400 || status === 401 || status === 402 || status === 429) {
         recordFailure();
+        break; // If key is rate-limited or invalid, don't keep hammering free endpoints
       }
     }
   }
@@ -173,7 +169,7 @@ Provide institutional macro guidance and volatility risk warnings for XAU/USD. O
 
   const freeModels = [
     config.openrouter.model || 'openrouter/free',
-    'liquid/lfm-2.5-2.6b:free',
+    'google/gemma-4-26b-a4b-it:free',
     'nvidia/nemotron-3.5-lightning:free',
     config.openrouter.fallbackModel || 'nex-agi/nex-n2.5-mini:free',
   ];
@@ -182,20 +178,22 @@ Provide institutional macro guidance and volatility risk warnings for XAU/USD. O
     try {
       const res = await client.post('/chat/completions', {
         model,
-        models: freeModels,
-        route: 'fallback',
         messages: [
           { role: 'system', content: 'You are an institutional macro risk manager. DO NOT provide trade setups, entry prices, stop losses, or profit targets. Provide ONLY macro guidance and risk warnings.' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.15,
-        max_tokens: 180, // strictly capped
-        response_format: { type: 'json_object' },
+        max_tokens: 220, // strictly capped
       });
 
       const raw = res.data.choices?.[0]?.message?.content;
       if (!raw) continue;
-      let parsed = JSON.parse(raw);
+      let parsed;
+      try {
+        const match = raw.match(/\{[\s\S]*?\}/);
+        if (match) parsed = JSON.parse(match[0]);
+      } catch (_) {}
+
       if (parsed && parsed.guidance) {
         return {
           ...parsed,
@@ -204,7 +202,12 @@ Provide institutional macro guidance and volatility risk warnings for XAU/USD. O
           generatedAt: new Date().toISOString(),
         };
       }
-    } catch (_) {}
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 400 || status === 401 || status === 402 || status === 429) {
+        break;
+      }
+    }
   }
 
   // Algorithmic deterministic market condition fallback
