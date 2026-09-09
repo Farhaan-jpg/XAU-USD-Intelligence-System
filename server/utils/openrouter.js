@@ -79,11 +79,22 @@ Summary: ${summary || '(no summary available)'}
 
 Analyze the gold (XAU/USD) trading impact of this news item.`;
 
-  // Try primary model, fall back to secondary
-  for (const model of [config.openrouter.model, config.openrouter.fallbackModel]) {
+  // Primary free auto-fallback models list
+  const freeModelsList = [
+    config.openrouter.model || 'openrouter/free',
+    'nvidia/nemotron-3.5-lightning:free',
+    'liquid/lfm-2.5-2.6b:free',
+    'inclusionai/ling-3.0-flash-fin:free',
+    config.openrouter.fallbackModel || 'nex-agi/nex-n2.5-mini:free',
+  ];
+
+  // Try OpenRouter auto fallback models
+  for (const model of freeModelsList) {
     try {
       const response = await client.post('/chat/completions', {
         model,
+        models: freeModelsList, // Enables OpenRouter built-in automatic failover across free models
+        route: 'fallback',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userContent },

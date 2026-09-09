@@ -20,8 +20,8 @@ const config = {
   openrouter: {
     apiKey: process.env.OPENROUTER_API_KEY,
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'google/gemma-4-31b-it:free',
-    fallbackModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+    model: 'openrouter/free', // Official Free Models Router (auto-switches across all available free models)
+    fallbackModel: 'nvidia/nemotron-3.5-lightning:free',
   },
 
   telegram: {

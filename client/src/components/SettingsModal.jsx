@@ -17,7 +17,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [selectedGoogleModel, setSelectedGoogleModel] = useState('gemini-3.6-flash');
   const [discoveredModels, setDiscoveredModels] = useState([]);
   const [openrouterKey, setOpenrouterKey] = useState('');
-  const [openrouterModel, setOpenrouterModel] = useState('google/gemma-4-31b-it:free');
+  const [openrouterModel, setOpenrouterModel] = useState('openrouter/free');
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
@@ -35,7 +35,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         }
         if (data.openrouter) {
           setOpenrouterKey(data.openrouter.maskedKey || '');
-          setOpenrouterModel(data.openrouter.model || 'google/gemma-4-31b-it:free');
+          setOpenrouterModel(data.openrouter.model || 'openrouter/free');
         }
         if (data.telegram) {
           setTelegramToken(data.telegram.maskedToken || '');
@@ -258,13 +258,21 @@ export default function SettingsModal({ isOpen, onClose }) {
                 </div>
 
                 <div className="calc-field">
-                  <label className="calc-label">FALLBACK MODEL SLUG</label>
-                  <input
-                    type="text"
+                  <label className="calc-label">OPENROUTER FREE AUTO-FALLBACK MODEL</label>
+                  <select
                     className="calc-input"
                     value={openrouterModel}
                     onChange={(e) => setOpenrouterModel(e.target.value)}
-                  />
+                  >
+                    <option value="openrouter/free">openrouter/free (Official Free Models Router & Auto-Fallback)</option>
+                    <option value="nvidia/nemotron-3.5-lightning:free">nvidia/nemotron-3.5-lightning:free</option>
+                    <option value="liquid/lfm-2.5-2.6b:free">liquid/lfm-2.5-2.6b:free</option>
+                    <option value="inclusionai/ling-3.0-flash-fin:free">inclusionai/ling-3.0-flash-fin:free (Financial)</option>
+                    <option value="nex-agi/nex-n2.5-mini:free">nex-agi/nex-n2.5-mini:free</option>
+                  </select>
+                  <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
+                    Uses OpenRouter automatic failover routing across 18 free models at zero cost.
+                  </span>
                 </div>
               </div>
 
