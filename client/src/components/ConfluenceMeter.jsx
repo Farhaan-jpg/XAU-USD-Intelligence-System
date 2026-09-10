@@ -360,7 +360,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
               <span style={{ fontSize: '10px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: b.color }}>
                 {b.value}
               </span>
-              <span style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '9px', color: 'var(--text-muted)', lineHeight: 1.25 }}>
                 {b.detail}
               </span>
             </div>
@@ -376,7 +376,10 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
           const fillColor = isBull ? 'var(--bull-primary)' : isBear ? 'var(--bear-primary)' : 'var(--gold-primary)';
           return (
             <div key={f.label} className="breakdown-row">
-              <span className="breakdown-row-label">{f.label}</span>
+              <div className="breakdown-row-header">
+                <span className="breakdown-row-label">{f.label}</span>
+                <span className="breakdown-val" style={{ color: fillColor }}>{f.value}%</span>
+              </div>
               <div className="breakdown-bar-bg">
                 <div
                   className="breakdown-bar-fill"
@@ -386,7 +389,6 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
                   }}
                 />
               </div>
-              <span className="breakdown-val">{f.value}%</span>
             </div>
           );
         })}
