@@ -373,8 +373,8 @@ export default function App() {
             {/* CFTC Institutional Speculator vs Commercial Sentiment Stacked Delta Bar + 8-Week Trend Sparkline */}
             <COTSentimentGauge cotData={cotData} />
 
-            {/* Expandable AI Market Guidance & Volatility Intelligence Panel */}
-            <AIMarketGuidance activeSession={activeSession} />
+            {/* Real-Time Institutional Market Guidance & Volatility Intelligence Panel */}
+            <AIMarketGuidance activeSession={activeSession} prices={prices} calendarData={calendarData} />
 
             {/* Bottom Grid: Real-Time Economic Calendar & News Wire */}
             <div className="grid-terminal-events-news">
@@ -387,7 +387,7 @@ export default function App() {
         {/* Tab 2: AI Market Guidance Focus */}
         {activeTab === 'GUIDANCE' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <AIMarketGuidance activeSession={activeSession} />
+            <AIMarketGuidance activeSession={activeSession} prices={prices} calendarData={calendarData} />
             <FearGreedGauge prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <SmartLiquidityRadar prices={prices} />

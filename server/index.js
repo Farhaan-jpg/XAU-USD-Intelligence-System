@@ -146,7 +146,27 @@ app.post('/api/ai/guidance', async (req, res) => {
       } : null,
     };
 
-    const guidance = await aiOrchestrator.getMarketGuidance(marketData);
+    const fastFallbackGuidance = () => {
+      const goldChange = parseFloat(marketData.goldChange5m || 0);
+      const isSelling = goldChange < -0.10;
+      const isRallying = goldChange > 0.10;
+      const regime = isSelling ? 'LONG LIQUIDATION / SELL CASCADE' : isRallying ? 'BULLISH EXPANSION' : 'EQUILIBRIUM ACCUMULATION';
+      const riskLevel = (marketData.nextEvent && marketData.nextEvent.minsUntil <= 20) || isSelling ? 'CRITICAL' : isRallying ? 'ELEVATED' : 'NORMAL';
+      return {
+        regime,
+        riskLevel,
+        guidance: `Spot Gold trading at $${marketData.goldPrice} (${goldChange >= 0 ? '+' : ''}${goldChange.toFixed(2)}% 5M) under ${marketData.activeSession}. Real-time intermarket drivers show DXY at ${marketData.dxyPrice} and 10Y Yields at ${marketData.us10yPrice}%.`,
+        warnings: marketData.nextEvent ? [`Upcoming catalyst: ${marketData.nextEvent.title} in ${marketData.nextEvent.minsUntil}m.`] : ['Maintain active stop armor against session sweeps.'],
+        model: 'instant-quantitative-guidance',
+        provider: 'Real-Time Market Engine',
+        generatedAt: new Date().toISOString(),
+      };
+    };
+
+    const guidance = await Promise.race([
+      aiOrchestrator.getMarketGuidance(marketData),
+      new Promise((resolve) => setTimeout(() => resolve(fastFallbackGuidance()), 1500)),
+    ]);
     res.json({ success: true, guidance, marketData });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

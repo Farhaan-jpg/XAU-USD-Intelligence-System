@@ -77,6 +77,86 @@ async function fetchFeed(feed) {
 }
 
 /**
+ * Real-time synchronous institutional NLP classifier for Gold (XAU/USD) news
+ * Assigns bias, impact, and reasoning in 0ms without waiting for external API queues
+ */
+function classifyInstantGoldNews(title, summary, source = '') {
+  const text = `${title} ${summary}`.toLowerCase();
+
+  // Bearish signals for Gold (Strength in USD, Yields, Hawkish Central Banks, Ceasefire, Selloffs)
+  const bearishPatterns = [
+    { regex: /\b(rate hike|hike rates|hawkish|higher for longer|delay rate cut|cuts delayed|no rate cut|paring cut)\b/, weight: 4, reason: 'Hawkish Fed interest rate stance reduces bullion appeal' },
+    { regex: /\b(dollar (surges|rallies|jumps|strengthens|climbs|firms|hits high)|dxy (surges|rallies|jumps|high)|strong dollar|usd gains)\b/, weight: 4, reason: 'US Dollar surge creates immediate direct headwind for gold' },
+    { regex: /\b(yields? (surge|spike|climb|jump|rise)|treasury yields? up|10-year yield jumps)\b/, weight: 3, reason: 'Rising US Treasury yields increase the opportunity cost of holding non-yielding gold' },
+    { regex: /\b(cpi (jumps|heats up|accelerates|rises|beats)|hot inflation|inflation stubbornly high)\b/, weight: 3, reason: 'Hotter inflation elevates sticky Fed rate policy expectations' },
+    { regex: /\b(nfp beats|strong payrolls|jobs beat|jobless claims drop|unemployment falls)\b/, weight: 3, reason: 'Robust US employment data dampens aggressive easing expectations' },
+    { regex: /\b(gold (slumps|plunges|slides|sinks|drops|falls|retreats|tumbl|selloff)|gold bears|liquidation cascade)\b/, weight: 3, reason: 'Technical selling momentum and order book liquidation pressure' },
+    { regex: /\b(ceasefire|peace talks|de-escalat|tensions ease|diplomacy|deal reached)\b/, weight: 3, reason: 'Geopolitical de-escalation unwinds safe-haven risk premia' },
+    { regex: /\b(risk-on|stocks (rally|surge|jump)|equities surge|wall st gains)\b/, weight: 2, reason: 'Risk-on equity flow diverts institutional capital away from defensive assets' },
+  ];
+
+  // Bullish signals for Gold (Weak USD, Rate cuts, Dovish Fed, Geopolitical war/escalation, Safe-haven, CB buying)
+  const bullishPatterns = [
+    { regex: /\b(rate cut|fed cuts|cuts rates|dovish|monetary easing|easier policy|policy easing)\b/, weight: 4, reason: 'Fed monetary easing and rate cuts directly boost non-yielding bullion demand' },
+    { regex: /\b(dollar (slides|drops|plunges|weakens|tumbles|falls|slumps)|weak dollar|dxy (drops|slides|falls|plunges)|usd drops)\b/, weight: 4, reason: 'US Dollar weakness directly inflates dollar-denominated gold purchasing power' },
+    { regex: /\b(yields? (plunge|slide|fall|drop|tumble)|treasury yields? sink|10-year yield falls)\b/, weight: 3, reason: 'Falling sovereign yields diminish bond competition against gold reserves' },
+    { regex: /\b(cpi cools|inflation slows|inflation eases|ppi cools|soft inflation)\b/, weight: 3, reason: 'Cooling inflation provides room for accelerated central bank rate cuts' },
+    { regex: /\b(nfp misses|weak payrolls|jobs miss|unemployment rises|jobless claims jump|labor market slows)\b/, weight: 3, reason: 'Weakening US labor data increases urgency for monetary stimulus' },
+    { regex: /\b(war|missile|air strike|attack|drone strike|escalat|iran|israel|middle east conflict|russia|ukraine|houthi|invasion|strait of hormuz)\b/, weight: 4, reason: 'Geopolitical conflict and heightened military risk drive aggressive safe-haven allocation' },
+    { regex: /\b(safe[- ]haven|flight to safety|haven demand|geopolitical hedge|stagflation|recession risk)\b/, weight: 3, reason: 'Elevated macroeconomic systemic risk triggers defensive flight to safety' },
+    { regex: /\b(central bank|pboc|china buys gold|gold reserves|bullion reserve|physical gold demand|gold buying)\b/, weight: 4, reason: 'Sovereign central bank de-dollarization and structural physical accumulation' },
+    { regex: /\b(gold (surges|rallies|jumps|climbs|soars|hits record|record high|all-time high|breaks out))\b/, weight: 3, reason: 'Strong technical breakout and trend-following momentum' },
+  ];
+
+  let bullScore = 0;
+  let bearScore = 0;
+  let bullReasons = [];
+  let bearReasons = [];
+
+  for (const p of bullishPatterns) {
+    if (p.regex.test(text)) {
+      bullScore += p.weight;
+      bullReasons.push(p.reason);
+    }
+  }
+
+  for (const p of bearishPatterns) {
+    if (p.regex.test(text)) {
+      bearScore += p.weight;
+      bearReasons.push(p.reason);
+    }
+  }
+
+  // Determine Impact
+  const highImpactKeywords = /\b(fomc|fed chair|powell|interest rate|cpi|nfp|non-farm|war|iran|israel|missile|nuclear|crisis|emergency|record high|gdp)\b/;
+  const medImpactKeywords = /\b(ppi|retail sales|jobless claims|pmi|treasury|bonds|central bank|sanctions|oil|crude)\b/;
+
+  let impact = 'LOW';
+  if (highImpactKeywords.test(text) || Math.max(bullScore, bearScore) >= 4) {
+    impact = 'HIGH';
+  } else if (medImpactKeywords.test(text) || Math.max(bullScore, bearScore) >= 2) {
+    impact = 'MED';
+  }
+
+  // Determine Directional Bias
+  let bias = 'NEUTRAL';
+  let reasoning = 'Routine macroeconomic development with balanced multi-directional implications for gold spot.';
+
+  if (bullScore > bearScore && bullScore >= 2) {
+    bias = 'BULLISH';
+    reasoning = bullReasons[0] || 'Bullish order flow catalyst for gold.';
+  } else if (bearScore > bullScore && bearScore >= 2) {
+    bias = 'BEARISH';
+    reasoning = bearReasons[0] || 'Bearish headwind for gold spot price.';
+  } else if (bullScore > 0 && bearScore > 0) {
+    bias = 'NEUTRAL';
+    reasoning = `Crosscurrent forces: ${bullReasons[0] || 'supportive factors'} countered by ${bearReasons[0] || 'bearish factors'}.`;
+  }
+
+  return { bias, impact, reasoning };
+}
+
+/**
  * Process a batch of items from a feed, filter out stale news, and maintain strict date ordering
  */
 function processFeedItems(rawItems) {
@@ -104,15 +184,15 @@ function processFeedItems(rawItems) {
     processedGuids.add(dedupeKey);
 
     const score = relevanceScore(raw.title, raw.summary);
-    const initialImpact = score >= 30 ? 'HIGH' : score >= 15 ? 'MED' : 'LOW';
+    const instantScoring = classifyInstantGoldNews(raw.title, raw.summary, raw.source);
 
     const newsItem = {
       id: `${pubTime}-${Math.random().toString(36).substring(2, 7)}`,
       ...raw,
-      impact: initialImpact,
-      bias: 'NEUTRAL',
-      reasoning: 'Evaluating live sentiment vector...',
-      model: 'evaluating-ai',
+      impact: instantScoring.impact,
+      bias: instantScoring.bias,
+      reasoning: instantScoring.reasoning,
+      model: 'instant-algorithmic-nlp',
       relevanceScore: score,
       processedAt: new Date().toISOString(),
     };
@@ -124,7 +204,14 @@ function processFeedItems(rawItems) {
       io.emit('news_item', newsItem);
     }
 
-    // Queue for AI scoring
+    // High-impact alert trigger
+    if (newsItem.impact === 'HIGH') {
+      telegramEngine.sendNewsAlert(newsItem).catch((err) =>
+        console.error('[NEWS] Telegram alert error:', err.message)
+      );
+    }
+
+    // Optional background refinement if Gemini key exists
     enqueueForScoring(newsItem, raw);
   }
 

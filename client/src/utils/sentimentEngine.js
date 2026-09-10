@@ -53,29 +53,25 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
   const totalMacroDrag = Math.max(-35, Math.min(35, dxyDrag + yldDrag));
   const macroScore = Math.max(10, Math.min(90, Math.round(50 - totalMacroDrag)));
 
-  // 3. AI News Sentiment Vector (20% weight)
-  const recentNews = (newsFeed || []).slice(0, 25);
-  let bullWeight = 0;
-  let bearWeight = 0;
-  let neutralWeight = 0;
-  const nowMs = Date.now();
+  // 3. Real-Time Intraday Momentum & VWAP Flow (20% weight)
+  // Sub-second quantitative order flow: distance to session VWAP proxy, 1m/5m/15m multi-horizon velocity, and Gold/Silver beta
+  const vwapProxy = (goldHigh + goldLow + spotPrice + goldOpen) / 4;
+  const vwapDist = vwapProxy > 0 ? ((spotPrice - vwapProxy) / vwapProxy) * 100 : 0;
+  const vwapPoints = Math.max(-25, Math.min(25, vwapDist * 50));
 
-  recentNews.forEach((item) => {
-    const baseW = item.impact === 'HIGH' ? 3.0 : item.impact === 'MED' ? 1.8 : 1.0;
-    const pubMs = new Date(item.publishedAt || item.processedAt || nowMs).getTime();
-    const ageMins = Math.max(0, (nowMs - pubMs) / 60000);
-    const recencyFactor = ageMins <= 30 ? 1.5 : ageMins <= 120 ? 1.2 : ageMins <= 360 ? 1.0 : 0.7;
-    const w = baseW * recencyFactor;
+  const goldChg1m = parseFloat(gold.intervals?.['1']?.chp ?? goldChg5m);
+  const silver = prices['SI=F'] || prices['XAGUSD'] || {};
+  const silverChg5m = parseFloat(silver.change5m || 0);
+  const silverBetaSpread = silverChg5m - goldChg5m;
 
-    if (item.bias === 'BULLISH') bullWeight += w;
-    else if (item.bias === 'BEARISH') bearWeight += w;
-    else neutralWeight += w * 0.5;
-  });
+  const trendFlowVelocity =
+    (goldChg1m * 25) +
+    (goldChg5m * 25) +
+    (goldChg15m * 15) +
+    vwapPoints +
+    (silverBetaSpread * 6);
 
-  const totalNewsWeight = bullWeight + bearWeight + neutralWeight;
-  const newsScore = totalNewsWeight > 0
-    ? Math.max(10, Math.min(90, Math.round(((bullWeight + neutralWeight * 0.5) / totalNewsWeight) * 100)))
-    : 50;
+  const trendFlowScore = Math.max(10, Math.min(90, Math.round(50 + trendFlowVelocity)));
 
   // 4. Macro Catalyst Proximity (15% weight)
   const upcoming = calendarData?.upcomingEvents || calendarData?.events || [];
@@ -83,6 +79,7 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
   let eventScore = 50;
 
   if (nextHigh) {
+    const nowMs = Date.now();
     const eventTime = new Date(nextHigh.date || nextHigh.timeUTC || 0).getTime();
     const minsUntil = (eventTime - nowMs) / 60000;
 
@@ -134,7 +131,7 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
       Math.round(
         momentumScore * 0.25 +
         macroScore * 0.25 +
-        newsScore * 0.20 +
+        trendFlowScore * 0.20 +
         eventScore * 0.15 +
         cotScore * 0.15
       )
@@ -165,7 +162,7 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
     components: [
       { label: 'Gold Momentum (25%)', val: Math.round(momentumScore) },
       { label: 'Macro Inverse Yield (25%)', val: Math.round(macroScore) },
-      { label: 'AI News Vector (20%)', val: Math.round(newsScore) },
+      { label: 'Trend & VWAP Flow (20%)', val: Math.round(trendFlowScore) },
       { label: 'Catalyst Risk (15%)', val: Math.round(eventScore) },
       { label: 'CFTC COT Spec (15%)', val: Math.round(cotScore) },
     ],

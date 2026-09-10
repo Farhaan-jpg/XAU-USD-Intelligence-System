@@ -86,26 +86,45 @@ let isRunning = false;
 let tvStreamer = null;
 let lastWsTickTime = 0;
 let broadcastThrottleTimer = null;
+let lastBroadcastTime = 0;
+const BROADCAST_THROTTLE_MS = 50; // up to 20 fps - sub-second real-time delivery with zero artificial lag
 
 function init(socketIo) {
   io = socketIo;
 }
 
 /**
- * Throttle socket broadcast to max 4 times per second to keep frontend ultra-responsive
- * without swamping the browser React render loop
+ * Ultra-responsive leading-edge + trailing-edge broadcast throttle
+ * Dispatches the first tick immediately (0ms delay) and caps subsequent bursts to 50ms intervals
  */
 function scheduleBroadcast() {
-  if (broadcastThrottleTimer) return;
-  broadcastThrottleTimer = setTimeout(() => {
-    broadcastThrottleTimer = null;
+  const now = Date.now();
+  const elapsed = now - lastBroadcastTime;
+
+  if (elapsed >= BROADCAST_THROTTLE_MS) {
+    if (broadcastThrottleTimer) {
+      clearTimeout(broadcastThrottleTimer);
+      broadcastThrottleTimer = null;
+    }
+    lastBroadcastTime = now;
     if (io) {
       io.emit('price_update', {
         prices: latestPrices,
         serverTime: new Date().toISOString(),
       });
     }
-  }, 250);
+  } else if (!broadcastThrottleTimer) {
+    broadcastThrottleTimer = setTimeout(() => {
+      broadcastThrottleTimer = null;
+      lastBroadcastTime = Date.now();
+      if (io) {
+        io.emit('price_update', {
+          prices: latestPrices,
+          serverTime: new Date().toISOString(),
+        });
+      }
+    }, BROADCAST_THROTTLE_MS - elapsed);
+  }
 }
 
 /**
@@ -525,10 +544,16 @@ async function fetchAllPrices() {
 
   // Gold & Silver stream sub-second via WebSocket when active (HTTP fallback only if inactive).
   // Macro instruments (DXY, 10Y, 2Y, USDJPY, OIL) are ALWAYS polled concurrently every cycle to guarantee zero delays.
+  const safeQuote = (sym) =>
+    Promise.race([
+      yahooFinance.quote(sym),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
+    ]).catch(() => null);
+
   const promises = [
     wsActive ? Promise.resolve(null) : fetchLiveGoldSpot(),
     wsActive ? Promise.resolve(null) : fetchLiveSilverSpot(),
-    ...macroSymbols.map((sym) => yahooFinance.quote(sym).catch(() => null)),
+    ...macroSymbols.map((sym) => safeQuote(sym)),
   ];
 
   const [goldSpotRes, silverSpotRes, ...yahooQuotes] = await Promise.allSettled(promises);

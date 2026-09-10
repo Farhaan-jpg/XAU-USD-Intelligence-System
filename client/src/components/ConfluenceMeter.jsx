@@ -118,30 +118,22 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
 
     const techVal = Math.max(10, Math.min(90, Math.round(50 + techDelta)));
 
-    // 4. AI News Sentiment with Recency Decay & Catalyst Risk
-    const recent = newsFeed.slice(0, 25);
-    let bullWeight = 0;
-    let bearWeight = 0;
-    let neutralWeight = 0;
-    const nowMs = Date.now();
+    // 4. Real-Time Intraday Momentum & VWAP Flow Vector (18% weight)
+    // 100% pure quantitative sub-second order flow: distance to session VWAP proxy, 1m/5m/15m multi-interval velocity, and Silver beta
+    const vwapProxy = (goldHigh + goldLow + spotPrice + goldOpen) / 4;
+    const vwapDist = vwapProxy > 0 ? ((spotPrice - vwapProxy) / vwapProxy) * 100 : 0;
+    const vwapPoints = Math.max(-25, Math.min(25, vwapDist * 55));
 
-    recent.forEach((item) => {
-      const baseW = item.impact === 'HIGH' ? 3.5 : item.impact === 'MED' ? 2.0 : 1.0;
-      const pubMs = new Date(item.publishedAt || item.processedAt || nowMs).getTime();
-      const ageMins = Math.max(0, (nowMs - pubMs) / 60000);
-      const recencyFactor = ageMins <= 30 ? 1.5 : ageMins <= 120 ? 1.2 : ageMins <= 360 ? 1.0 : 0.7;
-      const w = baseW * recencyFactor;
+    const goldChg1m = parseFloat(gold.intervals?.['1']?.chp ?? goldChg5m);
 
-      if (item.bias === 'BULLISH') bullWeight += w;
-      else if (item.bias === 'BEARISH') bearWeight += w;
-      else neutralWeight += w * 0.5;
-    });
+    const momentumFlowVelocity =
+      (goldChg1m * 26) +
+      (goldChg5m * 26) +
+      (goldChg15m * 14) +
+      vwapPoints +
+      (silverBetaSpread * 6);
 
-    const totalWeight = bullWeight + bearWeight + neutralWeight;
-    const sentimentVal =
-      totalWeight > 0
-        ? Math.max(10, Math.min(90, Math.round(((bullWeight + neutralWeight * 0.5) / totalWeight) * 100)))
-        : 50;
+    const momentumFlowVal = Math.max(10, Math.min(90, Math.round(50 + momentumFlowVelocity)));
 
     // Catalyst Event Direction & Warning
     let imminentEventWarning = null;
@@ -149,6 +141,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const nextHigh = upcoming.find((e) => e.impact === 'HIGH');
 
     if (nextHigh) {
+      const nowMs = Date.now();
       const eventTime = new Date(nextHigh.date || nextHigh.timeUTC).getTime();
       const diffMins = Math.round((eventTime - nowMs) / 60000);
       if (diffMins >= 0 && diffMins <= 30) {
@@ -180,19 +173,19 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const isTrendDriven = techVal <= 32 || techVal >= 68;
     const wTech = isTrendDriven ? 0.35 : 0.22;
     const wPsych = isTrendDriven ? 0.30 : 0.22;
-    const wMacro = isTrendDriven ? 0.15 : 0.24;
-    const wNews = isTrendDriven ? 0.10 : 0.18;
-    const wCot = isTrendDriven ? 0.10 : 0.14;
+    const wFlow = isTrendDriven ? 0.20 : 0.18;
+    const wMacro = isTrendDriven ? 0.10 : 0.24;
+    const wCot = isTrendDriven ? 0.05 : 0.14;
 
     const composite = Math.max(
       0,
       Math.min(
         100,
         Math.round(
-          (macroVal * wMacro) +
-          (psychologyVal * wPsych) +
           (techVal * wTech) +
-          (sentimentVal * wNews) +
+          (psychologyVal * wPsych) +
+          (momentumFlowVal * wFlow) +
+          (macroVal * wMacro) +
           (cotVal * wCot)
         )
       )
@@ -222,13 +215,14 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       macroVal,
       psychologyVal,
       techVal,
-      sentimentVal,
+      momentumFlowVal,
+      sentimentVal: momentumFlowVal,
       cotVal,
       isTrendDriven,
       wTech,
       wPsych,
+      wFlow,
       wMacro,
-      wNews,
       wCot,
       imminentEventWarning,
       psychAnalysis,
@@ -285,9 +279,9 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
   const factors = [
     { label: `SMC Liquidity Flow (${isTrend ? '35%' : '22%'})`, value: calculation.techVal },
     { label: `Trader Psychology & Traps (${isTrend ? '30%' : '22%'})`, value: calculation.psychologyVal },
-    { label: `Macro & Yields (${isTrend ? '15%' : '24%'})`, value: calculation.macroVal },
-    { label: `AI News Vector (${isTrend ? '10%' : '18%'})`, value: calculation.sentimentVal },
-    { label: `CFTC Institutional COT (${isTrend ? '10%' : '14%'})`, value: calculation.cotVal },
+    { label: `Real-Time Momentum Flow (${isTrend ? '20%' : '18%'})`, value: calculation.momentumFlowVal },
+    { label: `Macro & Yields (${isTrend ? '10%' : '24%'})`, value: calculation.macroVal },
+    { label: `CFTC Institutional COT (${isTrend ? '5%' : '14%'})`, value: calculation.cotVal },
   ];
 
   return (
