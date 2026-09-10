@@ -8,6 +8,7 @@ const config = require('../config');
 const { isGoldRelevant, relevanceScore } = require('../utils/goldFilter');
 const aiOrchestrator = require('../utils/aiOrchestrator');
 const telegramEngine = require('./telegramEngine');
+const newsArchive = require('../utils/newsArchive');
 
 const parser = new Parser({
   timeout: 4500, // 4.5-second cutoff to prevent hanging connections
@@ -147,6 +148,10 @@ function processFeedItems(rawItems) {
     latestNews = Array.from(map.values())
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
       .slice(0, MAX_NEWS);
+
+    try {
+      newsArchive.addItems(newlyAccepted);
+    } catch (_) {}
   }
 
   return newlyAccepted.length;
@@ -178,6 +183,10 @@ async function processScoringQueue() {
         newsItem.bias = aiSentiment.bias || newsItem.bias;
         newsItem.model = aiSentiment.model;
         newsItem.provider = aiSentiment.provider;
+
+        try {
+          newsArchive.updateItem(newsItem);
+        } catch (_) {}
 
         // Broadcast updated sentiment dynamically to update client market bias
         if (io) {

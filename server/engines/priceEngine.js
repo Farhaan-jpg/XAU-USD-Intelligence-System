@@ -223,6 +223,16 @@ class TVStreamer {
         cotEngine.updateWithLivePrice(newPrice, goldData.change5m);
       } catch (_) {}
 
+      // Track post-event price impact on high-impact catalysts
+      try {
+        const eventImpactTracker = require('../utils/eventImpactTracker');
+        const calendarEngine = require('./calendarEngine');
+        const calData = calendarEngine.getData();
+        if (calData && calData.events) {
+          eventImpactTracker.checkEvents(calData.events, newPrice);
+        }
+      } catch (_) {}
+
       scheduleBroadcast();
     } else if (isSilver) {
       const existing = latestPrices['SI=F'] || {};

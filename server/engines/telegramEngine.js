@@ -211,6 +211,37 @@ _Automated from XAU/USD Intelligence System_`;
 }
 
 /**
+ * Send a custom price level alert to Telegram
+ */
+async function sendCustomPriceAlert({ targetPrice, spotPrice, condition, label }) {
+  if (!isReady || !bot) return { success: false, error: 'Telegram bot not ready' };
+  const symbol = condition === '>' ? '🔺 Cross Above' : '🔻 Cross Below';
+  const msg = `🎯 *[XAU\\/USD CUSTOM PRICE ALERT]*\n\n` +
+    `📌 *Label:* ${escapeMarkdown(label || 'Target Level Crossed')}\n` +
+    `⚡ *Condition:* ${symbol} \\$${escapeMarkdown(String(targetPrice))}\n` +
+    `💰 *Current Spot:* \\$${escapeMarkdown(String(spotPrice))}\n` +
+    `🕐 *UTC Time:* ${escapeMarkdown(new Date().toUTCString())}\n\n` +
+    `_Institutional Workstation Alert_`;
+
+  try {
+    await bot.sendMessage(config.telegram.chatId, msg, {
+      parse_mode: 'MarkdownV2',
+      disable_web_page_preview: true,
+    });
+    console.log(`[TELEGRAM] ✅ Custom price alert sent for $${targetPrice}`);
+    return { success: true };
+  } catch (err) {
+    try {
+      const plain = `🎯 [XAU/USD CUSTOM PRICE ALERT]\n\nLabel: ${label || 'Target Level Crossed'}\nCondition: ${condition} $${targetPrice}\nCurrent Spot: $${spotPrice}\nTime: ${new Date().toUTCString()}`;
+      await bot.sendMessage(config.telegram.chatId, plain);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+}
+
+/**
  * Escape special MarkdownV2 characters
  */
 function escapeMarkdown(text) {
@@ -218,4 +249,4 @@ function escapeMarkdown(text) {
   return String(text).replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
 }
 
-module.exports = { init, sendNewsAlert, sendCalendarAlert, sendTradeSignal, sendStartupMessage, sendTestAlert, updateConfig };
+module.exports = { init, sendNewsAlert, sendCalendarAlert, sendTradeSignal, sendStartupMessage, sendTestAlert, sendCustomPriceAlert, updateConfig };

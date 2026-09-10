@@ -44,6 +44,18 @@ let cotState = {
   },
   // Open Interest
   totalOpenInterest: 498320,
+  // 8-Week Historical Trend Series (Chronological: Week -7 to Current Week)
+  weeklyHistory: [
+    { week: 'W-7', netLong: 204100, commercialNet: -218300 },
+    { week: 'W-6', netLong: 211500, commercialNet: -224600 },
+    { week: 'W-5', netLong: 219800, commercialNet: -231200 },
+    { week: 'W-4', netLong: 226300, commercialNet: -237500 },
+    { week: 'W-3', netLong: 222400, commercialNet: -234100 },
+    { week: 'W-2', netLong: 231900, commercialNet: -242800 },
+    { week: 'W-1', netLong: 235100, commercialNet: -245900 },
+    { week: 'Current', netLong: 237250, commercialNet: -248100 },
+  ],
+  weeklyNetChange: 2150,
   // Dynamic Real-Time Retail Crowd Sentiment
   retailSentiment: {
     longPct: 62,

@@ -16,6 +16,9 @@ const calendarEngine = require('./engines/calendarEngine');
 const cotEngine = require('./engines/cotEngine');
 const telegramEngine = require('./engines/telegramEngine');
 const aiOrchestrator = require('./utils/aiOrchestrator');
+const settingsStore = require('./utils/settingsStore');
+const newsArchive = require('./utils/newsArchive');
+const eventImpactTracker = require('./utils/eventImpactTracker');
 const fs = require('fs');
 
 // ─── App setup ───────────────────────────────────────────────────────────────
@@ -64,8 +67,47 @@ app.get('/api/news', (req, res) => {
   res.json(newsEngine.getLatest().slice(0, limit));
 });
 
+app.get('/api/news/archive', (req, res) => {
+  const { limit, query, date, bias, impact } = req.query;
+  const items = newsArchive.getArchivedNews({
+    limit: limit ? parseInt(limit, 10) : 50,
+    query,
+    date,
+    bias,
+    impact,
+  });
+  res.json({ success: true, count: items.length, items });
+});
+
 app.get('/api/calendar', (req, res) => {
   res.json(calendarEngine.getData());
+});
+
+app.get('/api/calendar/impacts', (req, res) => {
+  res.json({ success: true, impacts: eventImpactTracker.getRecentImpacts() });
+});
+
+// Custom price alert trigger (Telegram + WS)
+app.post('/api/alerts/trigger', async (req, res) => {
+  try {
+    const { targetPrice, spotPrice, condition, label } = req.body || {};
+    if (!targetPrice) {
+      return res.status(400).json({ success: false, error: 'Target price is required' });
+    }
+    const result = await telegramEngine.sendCustomPriceAlert({ targetPrice, spotPrice, condition, label });
+    if (io) {
+      io.emit('custom_price_alert', {
+        targetPrice,
+        spotPrice,
+        condition,
+        label,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // AI Endpoints
@@ -235,7 +277,21 @@ app.post('/api/settings', (req, res) => {
       if (intervals.calendar) config.intervals.calendar = parseInt(intervals.calendar, 10);
     }
 
-    res.json({ success: true, message: 'Settings updated successfully' });
+    // Persist settings to disk so they survive Render redeployments / container restarts
+    try {
+      settingsStore.saveSettings({
+        googleKey: googleKey || config.google.apiKey,
+        googleModel,
+        openrouterKey: openrouterKey || config.openrouter.apiKey,
+        model: model || config.openrouter.model,
+        fallbackModel: fallbackModel || config.openrouter.fallbackModel,
+        telegramToken: telegramToken || config.telegram.token,
+        telegramChatId: telegramChatId || config.telegram.chatId,
+        intervals: config.intervals,
+      });
+    } catch (_) {}
+
+    res.json({ success: true, message: 'Settings updated and persisted successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -318,6 +374,27 @@ async function bootstrap() {
   console.log('\n╔══════════════════════════════════════════════╗');
   console.log('║      XAU/USD PRO TRADING DASHBOARD           ║');
   console.log('╚══════════════════════════════════════════════╝\n');
+
+  // Load persisted user settings (if present)
+  try {
+    const persisted = settingsStore.loadSettings();
+    if (persisted) {
+      if (persisted.googleKey) config.google.apiKey = persisted.googleKey;
+      if (persisted.openrouterKey) config.openrouter.apiKey = persisted.openrouterKey;
+      if (persisted.model) config.openrouter.model = persisted.model;
+      if (persisted.fallbackModel) config.openrouter.fallbackModel = persisted.fallbackModel;
+      if (persisted.telegramToken) config.telegram.token = persisted.telegramToken;
+      if (persisted.telegramChatId) config.telegram.chatId = persisted.telegramChatId;
+      if (persisted.intervals) config.intervals = { ...config.intervals, ...persisted.intervals };
+      console.log('[BOOTSTRAP] 💾 Loaded persistent settings from disk');
+    }
+  } catch (err) {
+    console.warn('[BOOTSTRAP] Notice checking persistent settings:', err.message);
+  }
+
+  // Init historical news archive & event impact tracker
+  newsArchive.initArchive();
+  eventImpactTracker.init(io);
 
   // Init Telegram first so other engines can use it
   telegramEngine.init();

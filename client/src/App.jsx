@@ -1,7 +1,7 @@
 // client/src/App.jsx
 // Institutional Gold (XAU/USD) Trading Intelligence Workstation v3.0
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from './hooks/useSocket';
 import Header from './components/Header';
 import TradingChart from './components/TradingChart';
@@ -16,14 +16,24 @@ import StatusBar from './components/StatusBar';
 import SmartLiquidityRadar from './components/SmartLiquidityRadar';
 import VolatilityTrapDetector from './components/VolatilityTrapDetector';
 import COTSentimentGauge from './components/COTSentimentGauge';
-import { speakSquawk } from './utils/audioAlerts';
-import { AlertTriangle } from 'lucide-react';
+import PriceAlerts from './components/PriceAlerts';
+import AsianRangeBox from './components/AsianRangeBox';
+import FibCalculator from './components/FibCalculator';
+import FearGreedGauge from './components/FearGreedGauge';
+import EventImpactTracker from './components/EventImpactTracker';
+import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
+import { speakSquawk, toggleAudioMute } from './utils/audioAlerts';
+import { AlertTriangle, EyeOff } from 'lucide-react';
 
 export default function App() {
   const { connected, latency, prices, newsFeed, calendarData, cotData, latestAlert, calendarAlert } = useSocket();
   const [activeTab, setActiveTab] = useState('TERMINAL'); // 'TERMINAL' | 'GUIDANCE' | 'MACRO' | 'NEWS' | 'LIQUIDITY' | 'COT' | 'CALENDAR'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [aiTelemetry, setAiTelemetry] = useState({});
+  const [alertsCount, setAlertsCount] = useState(0);
 
   // Compute active trading session from UTC hour for context-aware AI guidance
   const activeSession = (() => {
@@ -46,6 +56,132 @@ export default function App() {
     fetchTelemetry();
     const timer = setInterval(fetchTelemetry, 15000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Sync active custom alerts count
+  const updateAlertsCount = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('xauusd_custom_alerts');
+      if (saved) {
+        const list = JSON.parse(saved);
+        setAlertsCount(list.filter((a) => a.active && !a.triggered).length);
+      } else {
+        setAlertsCount(0);
+      }
+    } catch (_) {
+      setAlertsCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    updateAlertsCount();
+    const timer = setInterval(updateAlertsCount, 3000);
+    return () => clearInterval(timer);
+  }, [updateAlertsCount]);
+
+  // Request browser push notification permission on first interaction
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      const ask = () => {
+        Notification.requestPermission().catch(() => {});
+        window.removeEventListener('click', ask);
+      };
+      window.addEventListener('click', ask, { once: true });
+    }
+  }, []);
+
+  // Native Push Notifications when tab is backgrounded
+  useEffect(() => {
+    if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      if (latestAlert && latestAlert.impact === 'HIGH') {
+        const headline = latestAlert.headline || latestAlert.title || 'Breaking News';
+        try {
+          const notif = new Notification('🚨 HIGH IMPACT GOLD ALERT', {
+            body: `${headline}\nBias: ${latestAlert.bias || 'Neutral'} | ${latestAlert.source || 'Wire'}`,
+            icon: '/favicon.ico',
+            tag: `news_${latestAlert.id || latestAlert.guid || headline}`,
+          });
+          notif.onclick = () => {
+            window.focus();
+            notif.close();
+          };
+        } catch (_) {}
+      }
+    }
+  }, [latestAlert?.id || latestAlert?.guid || latestAlert?.headline]);
+
+  // Push notification for high impact economic calendar warnings
+  useEffect(() => {
+    if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      if (calendarAlert?.event) {
+        const ev = calendarAlert.event;
+        try {
+          const notif = new Notification('📅 ECONOMIC WARNING (T-5 MIN)', {
+            body: `[${ev.currency}] ${ev.title} releases in ${calendarAlert.minutesLeft || 5} minutes. High volatility expected.`,
+            icon: '/favicon.ico',
+            tag: `cal_${ev.id}`,
+          });
+          notif.onclick = () => {
+            window.focus();
+            notif.close();
+          };
+        } catch (_) {}
+      }
+    }
+  }, [calendarAlert?.timestamp]);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore keystrokes inside input / textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+        return;
+      }
+
+      const key = e.key;
+
+      if (key >= '1' && key <= '7') {
+        const tabMap = {
+          '1': 'TERMINAL',
+          '2': 'GUIDANCE',
+          '3': 'MACRO',
+          '4': 'NEWS',
+          '5': 'LIQUIDITY',
+          '6': 'COT',
+          '7': 'CALENDAR',
+        };
+        if (tabMap[key]) {
+          e.preventDefault();
+          setActiveTab(tabMap[key]);
+        }
+      } else if (key === 'm' || key === 'M') {
+        e.preventDefault();
+        toggleAudioMute();
+      } else if (key === 'g' || key === 'G') {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('refresh_guidance'));
+      } else if (key === 's' || key === 'S') {
+        e.preventDefault();
+        setIsSettingsOpen((prev) => !prev);
+      } else if (key === 'p' || key === 'P') {
+        e.preventDefault();
+        setIsAlertsOpen((prev) => !prev);
+      } else if (key === 'f' || key === 'F') {
+        e.preventDefault();
+        setFocusMode((prev) => !prev);
+      } else if (key === '?' || key === 'h' || key === 'H') {
+        e.preventDefault();
+        setIsShortcutsOpen((prev) => !prev);
+      } else if (key === 'Escape') {
+        setIsSettingsOpen(false);
+        setIsAlertsOpen(false);
+        setIsShortcutsOpen(false);
+        setFocusMode(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Voice Squawk when high-impact breaking news arrives
@@ -133,17 +269,34 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app-terminal">
+    <div className={`app-terminal ${focusMode ? 'focus-mode-active' : ''}`}>
       {/* 48px Slim Sticky Institutional Header with Integrated Workspace Tabs */}
       <Header
         connected={connected}
         latency={latency}
         aiTelemetry={aiTelemetry}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenAlerts={() => setIsAlertsOpen(true)}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        focusMode={focusMode}
+        onToggleFocusMode={() => setFocusMode((f) => !f)}
+        alertsCount={alertsCount}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         newsCount={newsFeed.length}
       />
+
+      {/* Focus Mode Exit Floating Badge */}
+      {focusMode && (
+        <div
+          onClick={() => setFocusMode(false)}
+          className="focus-mode-floating-banner"
+          title="Click or press 'F' to exit focus mode"
+        >
+          <EyeOff size={13} />
+          <span>BLOOMBERG FOCUS MODE ACTIVE &bull; PRESS 'F' OR CLICK TO EXIT</span>
+        </div>
+      )}
 
       {/* Main Workspace Content */}
       <main className="terminal-main">
@@ -196,6 +349,9 @@ export default function App() {
             {/* Linear 24H Session Timeline Bar */}
             <SessionClock />
 
+            {/* Asian Session Range Tracker & London Raid Targets */}
+            <AsianRangeBox prices={prices} />
+
             {/* Post-News Volatility Trap Detector */}
             <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
 
@@ -211,7 +367,10 @@ export default function App() {
             {/* Middle Section: 8-Asset Macro Correlation Ribbon */}
             <MacroRadar prices={prices} />
 
-            {/* CFTC Institutional Speculator vs Commercial Sentiment Stacked Delta Bar */}
+            {/* Real-Time Gold Safe-Haven Fear & Greed Gauge */}
+            <FearGreedGauge prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
+
+            {/* CFTC Institutional Speculator vs Commercial Sentiment Stacked Delta Bar + 8-Week Trend Sparkline */}
             <COTSentimentGauge cotData={cotData} />
 
             {/* Expandable AI Market Guidance & Volatility Intelligence Panel */}
@@ -229,6 +388,7 @@ export default function App() {
         {activeTab === 'GUIDANCE' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <AIMarketGuidance activeSession={activeSession} />
+            <FearGreedGauge prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <SmartLiquidityRadar prices={prices} />
           </div>
@@ -253,6 +413,8 @@ export default function App() {
         {/* Tab 5: Smart Liquidity & SMC Focus */}
         {activeTab === 'LIQUIDITY' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <AsianRangeBox prices={prices} />
+            <FibCalculator prices={prices} />
             <SmartLiquidityRadar prices={prices} />
             <TradingChart prices={prices} />
             <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
@@ -263,6 +425,7 @@ export default function App() {
         {activeTab === 'COT' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <COTSentimentGauge cotData={cotData} />
+            <FearGreedGauge prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <MacroRadar prices={prices} />
           </div>
@@ -272,6 +435,7 @@ export default function App() {
         {activeTab === 'CALENDAR' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <EconomicCalendar calendarData={calendarData} />
+            <EventImpactTracker calendarData={calendarData} prices={prices} />
             <SessionClock />
           </div>
         )}
@@ -289,6 +453,19 @@ export default function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* Custom Price Alerts Manager Modal */}
+      <PriceAlerts
+        isOpen={isAlertsOpen}
+        onClose={() => setIsAlertsOpen(false)}
+        prices={prices}
+      />
+
+      {/* Keyboard Shortcuts Cheatsheet Modal */}
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsOpen}
+        onClose={() => setIsShortcutsOpen(false)}
       />
     </div>
   );

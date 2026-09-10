@@ -1061,3 +1061,118 @@ body {
 .tick-flash-down {
   color: var(--bear-primary) !important;
 }
+
+/* ─── Focus Mode / Dark Dimmer ────────────────────────── */
+.focus-mode-floating-banner {
+  position: fixed;
+  bottom: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(17, 22, 32, 0.95);
+  border: 1px solid var(--cyan-primary);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 15px rgba(56, 189, 248, 0.25);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--cyan-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.focus-mode-floating-banner:hover {
+  background: rgba(56, 189, 248, 0.15);
+  transform: translateX(-50%) scale(1.03);
+}
+
+.focus-mode-active .panel-card:not(.trading-chart-card):not(.confluence-panel) {
+  opacity: 0.28;
+  filter: blur(0.3px) grayscale(40%);
+  transition: all 0.3s ease;
+}
+
+.focus-mode-active .panel-card:not(.trading-chart-card):not(.confluence-panel):hover {
+  opacity: 1;
+  filter: none;
+}
+
+.focus-mode-active .trading-chart-card,
+.focus-mode-active .confluence-panel {
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* ─── Mobile & Tablet Responsive Layout ───────────────── */
+@media (max-width: 1200px) {
+  .grid-terminal-top {
+    grid-template-columns: 1fr !important;
+  }
+  .grid-terminal-events-news {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .terminal-header {
+    padding: 0 10px;
+  }
+  .header-nav-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: calc(100vw - 220px);
+  }
+  .header-nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .header-right .header-telemetry-item:nth-child(2) {
+    display: none; /* Hide UTC clock on small tablets to preserve space */
+  }
+  .grid-terminal-top,
+  .grid-terminal-events-news {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .terminal-header {
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  .header-brand {
+    font-size: 11px;
+  }
+  .brand-badge {
+    display: none;
+  }
+  .header-nav-tabs {
+    order: 3;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 4px;
+    padding-bottom: 2px;
+  }
+  .terminal-main {
+    padding: 8px;
+    gap: 10px;
+  }
+  .status-bar {
+    padding: 4px 8px;
+    font-size: 10px;
+    overflow-x: auto;
+  }
+  .modal-container {
+    width: 95vw !important;
+    max-height: 90vh !important;
+  }
+}

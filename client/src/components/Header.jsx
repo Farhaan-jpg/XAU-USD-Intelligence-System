@@ -16,6 +16,10 @@ import {
   Calendar,
   Target,
   Award,
+  Bell,
+  Eye,
+  EyeOff,
+  Keyboard,
 } from 'lucide-react';
 import {
   isMuted,
@@ -32,6 +36,11 @@ export default function Header({
   activeTab = 'TERMINAL',
   setActiveTab = () => {},
   newsCount = 0,
+  onOpenAlerts,
+  onOpenShortcuts,
+  focusMode = false,
+  onToggleFocusMode = () => {},
+  alertsCount = 0,
 }) {
   const [audioMuted, setAudioMuted] = useState(isMuted());
   const [utcTime, setUtcTime] = useState('');
@@ -158,16 +167,58 @@ export default function Header({
         <button
           className={`btn-ghost-icon ${audioMuted ? 'active' : ''}`}
           onClick={handleToggleAudio}
-          title={audioMuted ? 'Unmute voice and audio alerts' : 'Mute all audio alerts'}
+          title={audioMuted ? 'Unmute voice and audio alerts (M)' : 'Mute all audio alerts (M)'}
         >
           {audioMuted ? <VolumeX size={15} style={{ color: 'var(--bear-primary)' }} /> : <Volume2 size={15} />}
+        </button>
+
+        {/* Custom Price Alerts Button */}
+        <button
+          className="btn-ghost-icon"
+          onClick={onOpenAlerts}
+          title="Custom Price Level Alerts (P)"
+          style={{ position: 'relative' }}
+        >
+          <Bell size={15} style={{ color: alertsCount > 0 ? 'var(--gold-primary)' : undefined }} />
+          {alertsCount > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: 'var(--gold-primary)',
+              }}
+            />
+          )}
+        </button>
+
+        {/* Focus Mode / Dark Dimmer Button */}
+        <button
+          className={`btn-ghost-icon ${focusMode ? 'active' : ''}`}
+          onClick={onToggleFocusMode}
+          title={focusMode ? 'Exit Focus Mode (F)' : 'Enter Bloomberg Focus Mode (F)'}
+          style={focusMode ? { background: 'rgba(56, 189, 248, 0.15)', color: 'var(--cyan-primary)' } : {}}
+        >
+          {focusMode ? <EyeOff size={15} style={{ color: 'var(--cyan-primary)' }} /> : <Eye size={15} />}
+        </button>
+
+        {/* Keyboard Shortcuts Button */}
+        <button
+          className="btn-ghost-icon"
+          onClick={onOpenShortcuts}
+          title="Keyboard Shortcuts Cheatsheet (?)"
+        >
+          <Keyboard size={15} />
         </button>
 
         {/* Global Settings */}
         <button
           className="btn-ghost-icon"
           onClick={onOpenSettings}
-          title="Terminal Settings & AI Configuration"
+          title="Terminal Settings & AI Configuration (S)"
         >
           <Settings size={15} />
         </button>
