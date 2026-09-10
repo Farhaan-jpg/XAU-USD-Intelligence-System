@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Newspaper, Copy, Check, Volume2 } from 'lucide-react';
+import { Newspaper, Copy, Check, Volume2, ExternalLink } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
 function formatTimeAgo(dateStr) {
@@ -75,7 +75,7 @@ export default function NewsTerminal({ newsFeed = [] }) {
       <div className="panel-header">
         <span className="panel-title">
           <Newspaper size={13} />
-          REAL-TIME FINANCIAL & MACRO WIRE
+          REAL-TIME FINANCIAL &amp; MACRO WIRE
         </span>
 
         <div className="filter-pills-row">
@@ -100,6 +100,7 @@ export default function NewsTerminal({ newsFeed = [] }) {
         ) : (
           filteredNews.map((item) => {
             const headline = item.headline || item.title || '';
+            const sourceUrl = item.link || item.url || null;
             const isHigh = item.impact === 'HIGH';
             const isMed = item.impact === 'MED';
             const isBull = item.bias === 'BULLISH';
@@ -140,6 +141,21 @@ export default function NewsTerminal({ newsFeed = [] }) {
                     >
                       {formatTimeAgo(item.publishedAt)}
                     </span>
+
+                    {/* Source link icon — only shown when URL is available */}
+                    {sourceUrl && (
+                      <a
+                        href={sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-ghost-icon"
+                        style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+                        title={`Open source article — ${item.source || 'Publisher'}`}
+                      >
+                        <ExternalLink size={11} style={{ color: 'var(--cyan-primary)', opacity: 0.75 }} />
+                      </a>
+                    )}
+
                     <button
                       className="btn-ghost-icon"
                       style={{ width: '22px', height: '22px' }}
@@ -159,10 +175,22 @@ export default function NewsTerminal({ newsFeed = [] }) {
                   </div>
                 </div>
 
-                {/* Headline */}
-                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-main)', lineHeight: '1.4' }}>
-                  {headline}
-                </div>
+                {/* Headline — clickable link if source URL exists, plain text otherwise */}
+                {sourceUrl ? (
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="news-headline-link"
+                    title={`Read full article — ${item.source || 'Source'}`}
+                  >
+                    {headline}
+                  </a>
+                ) : (
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-main)', lineHeight: '1.4' }}>
+                    {headline}
+                  </div>
+                )}
 
                 {/* AI Reasoning Strip if present */}
                 {item.reasoning && (
@@ -196,9 +224,11 @@ export default function NewsTerminal({ newsFeed = [] }) {
           fontFamily: 'var(--font-mono)',
         }}
       >
-        <span>STREAMING DISPATCH</span>
+        <span>STREAMING DISPATCH · CLICK HEADLINE TO READ SOURCE</span>
         <span>{filteredNews.length} WIRE HEADLINES</span>
       </div>
     </div>
   );
 }
+
+

@@ -25,6 +25,7 @@ export function useSocket() {
   const [connected, setConnected] = useState(false);
   const [latency, setLatency] = useState(null);
   const pingTimerRef = useRef(null);
+  const backupPollRef = useRef(null);
 
   const [prices, setPrices] = useState({});
   const [newsFeed, setNewsFeed] = useState([]);
@@ -65,20 +66,27 @@ export function useSocket() {
       })
       .catch(() => {});
 
-    // Backup polling every 2.5s if socket connection is pending or recovering
-    const backupPollInterval = setInterval(fetchLatestPrices, 2500);
+    // Backup polling: start immediately for cold-start, stops once WebSocket is live
+    backupPollRef.current = setInterval(fetchLatestPrices, 2500);
 
     const onConnect = () => {
       setConnected(true);
       measureLatency(socket);
       // Start periodic latency measurement
       pingTimerRef.current = setInterval(() => measureLatency(socket), 10000);
+      // Stop backup polling when WebSocket is live
+      clearInterval(backupPollRef.current);
+      backupPollRef.current = null;
     };
 
     const onDisconnect = () => {
       setConnected(false);
       setLatency(null);
       if (pingTimerRef.current) clearInterval(pingTimerRef.current);
+      // Resume backup polling when WebSocket drops
+      if (!backupPollRef.current) {
+        backupPollRef.current = setInterval(fetchLatestPrices, 2500);
+      }
     };
 
     const onPriceUpdate = (data) => {
@@ -176,7 +184,8 @@ export function useSocket() {
       socket.off('calendar_alert', onCalendarAlert);
       socket.off('cot_update', onCotUpdate);
       if (pingTimerRef.current) clearInterval(pingTimerRef.current);
-      clearInterval(backupPollInterval);
+      clearInterval(backupPollRef.current);
+      backupPollRef.current = null;
     };
   }, [measureLatency]);
 

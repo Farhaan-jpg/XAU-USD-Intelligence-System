@@ -25,6 +25,16 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [aiTelemetry, setAiTelemetry] = useState({});
 
+  // Compute active trading session from UTC hour for context-aware AI guidance
+  const activeSession = (() => {
+    const h = new Date().getUTCHours();
+    if (h >= 0 && h < 7) return 'Asian Session';
+    if (h >= 7 && h < 12) return 'London Session';
+    if (h >= 12 && h < 17) return 'London/NY Overlap';
+    if (h >= 17 && h < 21) return 'New York Session';
+    return 'Late NY / Pre-Asian';
+  })();
+
   // Poll AI Telemetry
   useEffect(() => {
     const fetchTelemetry = () => {
@@ -205,7 +215,7 @@ export default function App() {
             <COTSentimentGauge cotData={cotData} />
 
             {/* Expandable AI Market Guidance & Volatility Intelligence Panel */}
-            <AIMarketGuidance prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <AIMarketGuidance activeSession={activeSession} />
 
             {/* Bottom Grid: Real-Time Economic Calendar & News Wire */}
             <div className="grid-terminal-events-news">
@@ -218,7 +228,7 @@ export default function App() {
         {/* Tab 2: AI Market Guidance Focus */}
         {activeTab === 'GUIDANCE' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <AIMarketGuidance prices={prices} newsFeed={newsFeed} calendarData={calendarData} />
+            <AIMarketGuidance activeSession={activeSession} />
             <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
             <SmartLiquidityRadar prices={prices} />
           </div>

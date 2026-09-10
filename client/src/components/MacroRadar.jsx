@@ -64,7 +64,12 @@ export default function MacroRadar({ prices = {} }) {
     }
 
     return null;
-  }, [gold, silver, dxy, us10y]);
+  }, [
+    gold.change5m, gold.changeDay,
+    silver.change5m,
+    dxy.change5m, dxy.changeDay,
+    us10y.change5m, us10y.changeDay,
+  ]);
 
   useEffect(() => {
     if (divergence) {

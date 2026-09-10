@@ -928,6 +928,24 @@ body {
   border-left: 2px solid var(--bear-primary);
 }
 
+/* Clickable news headline link */
+.news-headline-link {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-main);
+  line-height: 1.4;
+  text-decoration: none;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+
+.news-headline-link:hover {
+  color: var(--cyan-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Status Bar Bloomberg-Style */
 .terminal-footer {
   background: #0B0E14;

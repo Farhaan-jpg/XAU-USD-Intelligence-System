@@ -80,11 +80,11 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const silverBetaSpread = silverChg5m - goldChg5m;
 
     const techDelta =
-      (goldChg5m * 35) +
-      (goldChgDay * 12) +
-      (silverBetaSpread * 20) +
-      ((priceLocation - 0.5) * 20) +
-      (sessionInitiative * 5);
+      (goldChg5m * 32) +
+      (goldChgDay * 10) +
+      (silverBetaSpread * 8) +        // Reduced from 20 — silver noise should not dominate
+      ((priceLocation - 0.5) * 18) +
+      (sessionInitiative * 4);
 
     const techVal = Math.max(0, Math.min(100, Math.round(50 + techDelta)));
 
@@ -120,8 +120,8 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       }
     }
 
-    // 5. COT Positioning (0-100)
-    const cotVal = Math.max(0, Math.min(100, Math.round(cotData?.managedMoney?.biasPct || 78)));
+    // 5. COT Positioning (0-100) — default to 50 (neutral) when no real COT data loaded yet
+    const cotVal = Math.max(0, Math.min(100, Math.round(cotData?.managedMoney?.biasPct ?? 50)));
 
     // Composite Calculation (Weighted)
     const composite = Math.max(
