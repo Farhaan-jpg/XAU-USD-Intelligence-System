@@ -487,21 +487,17 @@ async function fetchAllPrices() {
 
   const wsActive = Date.now() - lastWsTickTime < 10000;
 
-  // If WebSocket is active, all 7 assets stream live ticks sub-second with zero delay.
-  // We only poll Yahoo Finance if WebSocket is inactive as fallback.
-  if (wsActive) {
-    return results;
-  }
-
+  // Gold & Silver stream sub-second via WebSocket when active (HTTP fallback only if inactive).
+  // Macro instruments (DXY, 10Y, 2Y, USDJPY, OIL) are ALWAYS polled concurrently every cycle to guarantee zero delays.
   const promises = [
-    fetchLiveGoldSpot(),
-    fetchLiveSilverSpot(),
+    wsActive ? Promise.resolve(null) : fetchLiveGoldSpot(),
+    wsActive ? Promise.resolve(null) : fetchLiveSilverSpot(),
     ...macroSymbols.map((sym) => yahooFinance.quote(sym).catch(() => null)),
   ];
 
   const [goldSpotRes, silverSpotRes, ...yahooQuotes] = await Promise.allSettled(promises);
 
-  // If WebSocket was inactive, apply HTTP spot fallback
+  // If WebSocket was inactive, apply HTTP spot fallback for Gold & Silver
   if (!wsActive) {
     const liveGold = goldSpotRes.status === 'fulfilled' ? goldSpotRes.value : null;
     const liveSilver = silverSpotRes.status === 'fulfilled' ? silverSpotRes.value : null;
@@ -597,7 +593,10 @@ async function fetchAllPrices() {
       return;
     }
 
-    const currentPrice = quote?.regularMarketPrice || latestPrices[symbol]?.price || 0;
+    const existing = latestPrices[symbol] || {};
+    const hasRecentWsTick = existing.updatedAt && (Date.now() - new Date(existing.updatedAt).getTime() < 4000) && existing.latency === 'REALTIME_WEBSOCKET';
+
+    const currentPrice = (hasRecentWsTick && existing.price) ? existing.price : (quote?.regularMarketPrice || existing.price || 0);
     if (currentPrice <= 0) return;
 
     if (!priceHistory[symbol]) priceHistory[symbol] = [];
@@ -606,8 +605,11 @@ async function fetchAllPrices() {
 
     const buf = priceHistory[symbol];
     const oldest = buf[0]?.price;
-    const change5m = oldest ? ((currentPrice - oldest) / oldest) * 100 : 0;
+    const change5m = oldest ? ((currentPrice - oldest) / oldest) * 100 : (existing.change5m || 0);
     const meta = INSTRUMENT_META[symbol] || {};
+    const changeDay = quote?.regularMarketChangePercent !== undefined 
+      ? parseFloat(quote.regularMarketChangePercent.toFixed(2)) 
+      : (existing.changeDay || 0);
 
     results[symbol] = {
       symbol,
@@ -617,16 +619,16 @@ async function fetchAllPrices() {
       correlation: meta.correlation || 'unknown',
       price: parseFloat(currentPrice.toFixed(symbol.includes('TNX') || symbol.includes('IRX') ? 3 : 2)),
       change5m: parseFloat(change5m.toFixed(4)),
-      changeDay: quote?.regularMarketChangePercent !== undefined ? parseFloat(quote.regularMarketChangePercent.toFixed(2)) : (latestPrices[symbol]?.changeDay || 0),
-      bid: quote?.bid || currentPrice,
-      ask: quote?.ask || currentPrice,
-      high: Math.max(quote?.regularMarketDayHigh || currentPrice, currentPrice),
-      low: Math.min(quote?.regularMarketDayLow || currentPrice, currentPrice),
-      volume: quote?.regularMarketVolume || 0,
+      changeDay,
+      bid: hasRecentWsTick ? (existing.bid || quote?.bid || currentPrice) : (quote?.bid || currentPrice),
+      ask: hasRecentWsTick ? (existing.ask || quote?.ask || currentPrice) : (quote?.ask || currentPrice),
+      high: Math.max(quote?.regularMarketDayHigh || currentPrice, currentPrice, existing.high || currentPrice),
+      low: Math.min(quote?.regularMarketDayLow || currentPrice, currentPrice, existing.low || currentPrice),
+      volume: quote?.regularMarketVolume || existing.volume || 0,
       direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
       updatedAt: new Date().toISOString(),
-      latency: 'FALLBACK_HTTP',
-      source: quote?.source || 'YAHOO_FINANCE',
+      latency: hasRecentWsTick ? 'REALTIME_WEBSOCKET' : 'REALTIME_HTTP',
+      source: hasRecentWsTick ? (existing.source || 'TVC_STREAM') : (quote?.source || 'YAHOO_FINANCE'),
     };
   });
 

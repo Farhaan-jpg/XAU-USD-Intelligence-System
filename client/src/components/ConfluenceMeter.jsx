@@ -1,9 +1,11 @@
 // client/src/components/ConfluenceMeter.jsx
-// Institutional Confluence & Composite Bias Meter with Slim Modern Arc & Uniform Factor Progress
+// Institutional Confluence & Composite Market Bias Engine
+// Integrates Intermarket Macro, Professional Trader Psychology & Contrarian Traps, SMC Liquidity, and News Vectors
 
 import { useMemo, useEffect, useRef } from 'react';
-import { ShieldAlert, TrendingUp, TrendingDown, Gauge, Minus } from 'lucide-react';
+import { ShieldAlert, TrendingUp, TrendingDown, Gauge, Minus, BrainCircuit, Users, Target, Compass } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
+import { calculateFearGreed, analyzeTraderPsychology } from '../utils/sentimentEngine';
 
 export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarData = {}, cotData = {} }) {
   const calculation = useMemo(() => {
@@ -32,7 +34,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const oilChg5m = parseFloat(oil.change5m || 0);
     const oilChgDay = parseFloat(oil.changeDay || 0);
 
-    // 1. Macro Dollar, Yields & Energy Intermarket Vector (0-100)
+    // 1. Macro Dollar, Yields & Energy Intermarket Vector (24% weight)
     const dxyImpulse = (dxyChg5m * 0.65) + (dxyChgDay * 0.35);
     const us10yImpulse = (us10yChg5m * 0.65) + (us10yChgDay * 0.35);
     const us02yImpulse = us02yChg5m;
@@ -40,15 +42,34 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const usdjpyImpulse = usdjpyChg5m;
 
     const macroDrag =
-      (dxyImpulse * 22) +
-      (us10yImpulse * 14) +
+      (dxyImpulse * 20) +
+      (us10yImpulse * 12) +
       (us02yImpulse * 8) +
       (usdjpyImpulse * 6) -
       (oilImpulse * 8);
 
-    const macroVal = Math.max(0, Math.min(100, Math.round(50 - macroDrag)));
+    const macroVal = Math.max(10, Math.min(90, Math.round(50 - macroDrag)));
 
-    // 2. AI News Sentiment with Recency Decay (0-100)
+    // 2. Trader Psychology & Crowd Contrarian Traps (22% weight)
+    const psychAnalysis = analyzeTraderPsychology({ prices, newsFeed, calendarData, cotData });
+    const psychologyVal = psychAnalysis.psychologyScore;
+
+    // 3. Technical Velocity & SMC Auction Structure (22% weight)
+    const dayRange = Math.max(1, goldHigh - goldLow);
+    const priceLocation = spotPrice > 0 ? (spotPrice - goldLow) / dayRange : 0.5;
+    const sessionInitiative = goldOpen > 0 && spotPrice >= goldOpen ? 1 : -1;
+    const silverBetaSpread = silverChg5m - goldChg5m;
+
+    const techDelta =
+      (goldChg5m * 28) +
+      (goldChgDay * 8) +
+      (silverBetaSpread * 6) +
+      ((priceLocation - 0.5) * 16) +
+      (sessionInitiative * 4);
+
+    const techVal = Math.max(10, Math.min(90, Math.round(50 + techDelta)));
+
+    // 4. AI News Sentiment with Recency Decay & Catalyst Risk (18% weight)
     const recent = newsFeed.slice(0, 25);
     let bullWeight = 0;
     let bearWeight = 0;
@@ -70,26 +91,10 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const totalWeight = bullWeight + bearWeight + neutralWeight;
     const sentimentVal =
       totalWeight > 0
-        ? Math.max(0, Math.min(100, Math.round(((bullWeight + neutralWeight * 0.5) / totalWeight) * 100)))
+        ? Math.max(10, Math.min(90, Math.round(((bullWeight + neutralWeight * 0.5) / totalWeight) * 100)))
         : 50;
 
-    // 3. Technical Velocity & SMC Auction Structure (0-100)
-    const dayRange = Math.max(1, goldHigh - goldLow);
-    const priceLocation = spotPrice > 0 ? (spotPrice - goldLow) / dayRange : 0.5;
-    const sessionInitiative = goldOpen > 0 && spotPrice >= goldOpen ? 1 : -1;
-    const silverBetaSpread = silverChg5m - goldChg5m;
-
-    const techDelta =
-      (goldChg5m * 32) +
-      (goldChgDay * 10) +
-      (silverBetaSpread * 8) +        // Reduced from 20 — silver noise should not dominate
-      ((priceLocation - 0.5) * 18) +
-      (sessionInitiative * 4);
-
-    const techVal = Math.max(0, Math.min(100, Math.round(50 + techDelta)));
-
-    // 4. Macro Catalyst & Calendar Event Direction (0-100)
-    let eventRiskVal = 50;
+    // Catalyst Event Direction & Warning
     let imminentEventWarning = null;
     const upcoming = calendarData?.events || calendarData?.upcomingEvents || [];
     const nextHigh = upcoming.find((e) => e.impact === 'HIGH');
@@ -97,43 +102,25 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     if (nextHigh) {
       const eventTime = new Date(nextHigh.date || nextHigh.timeUTC).getTime();
       const diffMins = Math.round((eventTime - nowMs) / 60000);
-
-      if (diffMins < 0 && diffMins >= -90 && nextHigh.actual && nextHigh.forecast) {
-        const act = parseFloat(nextHigh.actual);
-        const fcast = parseFloat(nextHigh.forecast);
-        if (!isNaN(act) && !isNaN(fcast)) {
-          const type = (nextHigh.type || nextHigh.title || '').toUpperCase();
-          const isDirectToGold =
-            type.includes('UNEMPLOYMENT') ||
-            type.includes('CLAIM') ||
-            nextHigh.currency === 'CNY';
-
-          if (isDirectToGold) {
-            eventRiskVal = act > fcast ? 75 : act < fcast ? 25 : 50;
-          } else {
-            eventRiskVal = act > fcast ? 25 : act < fcast ? 75 : 50;
-          }
-        }
-      } else if (diffMins >= 0 && diffMins <= 30) {
-        eventRiskVal = 50;
+      if (diffMins >= 0 && diffMins <= 30) {
         imminentEventWarning = `${nextHigh.title} in ${diffMins}m`;
       }
     }
 
-    // 5. COT Positioning (0-100) — default to 50 (neutral) when no real COT data loaded yet
-    const cotVal = Math.max(0, Math.min(100, Math.round(cotData?.managedMoney?.biasPct ?? 50)));
+    // 5. CFTC COT Institutional Speculators (14% weight)
+    const cotVal = Math.max(15, Math.min(85, Math.round(cotData?.managedMoney?.biasPct ?? 70)));
 
-    // Composite Calculation (Weighted)
+    // Composite Calculation (Weighted 5 Institutional Pillars)
     const composite = Math.max(
       0,
       Math.min(
         100,
         Math.round(
-          (macroVal * 0.28) +
-          (sentimentVal * 0.22) +
-          (techVal * 0.24) +
-          (eventRiskVal * 0.14) +
-          (cotVal * 0.12)
+          (macroVal * 0.24) +
+          (psychologyVal * 0.22) +
+          (techVal * 0.22) +
+          (sentimentVal * 0.18) +
+          (cotVal * 0.14)
         )
       )
     );
@@ -141,13 +128,13 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     let verdict = 'NEUTRAL CONVICTION';
     let verdictClass = 'neutral';
 
-    if (composite >= 75) {
+    if (composite >= 74) {
       verdict = 'STRONG BUY';
       verdictClass = 'bull';
     } else if (composite >= 58) {
       verdict = 'MODERATE BUY';
       verdictClass = 'bull';
-    } else if (composite <= 25) {
+    } else if (composite <= 26) {
       verdict = 'STRONG SELL';
       verdictClass = 'bear';
     } else if (composite <= 42) {
@@ -160,11 +147,12 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       verdict,
       verdictClass,
       macroVal,
-      sentimentVal,
+      psychologyVal,
       techVal,
-      eventRiskVal,
+      sentimentVal,
       cotVal,
       imminentEventWarning,
+      psychAnalysis,
     };
   }, [prices, newsFeed, calendarData, cotData]);
 
@@ -178,8 +166,8 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const tenMinutes = 10 * 60 * 1000;
 
     let newDirection = null;
-    if (score >= 78) newDirection = 'STRONG_BUY';
-    else if (score <= 22) newDirection = 'STRONG_SELL';
+    if (score >= 76) newDirection = 'STRONG_BUY';
+    else if (score <= 24) newDirection = 'STRONG_SELL';
 
     if (newDirection && newDirection !== lastAnnouncedDirectionRef.current) {
       if (now - lastAlertTimeRef.current >= tenMinutes) {
@@ -188,7 +176,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
 
         const isBull = newDirection === 'STRONG_BUY';
         speakSquawk(
-          `Institutional Confluence confirmed Strong ${isBull ? 'Bullish' : 'Bearish'} Bias on Gold. ${isBull ? 'Buyers dominating order flow.' : 'Sellers dominating order flow.'}`,
+          `Institutional Confluence confirmed Strong ${isBull ? 'Bullish' : 'Bearish'} Bias on Gold. ${calculation.psychAnalysis?.regime || ''}.`,
           {
             category: 'confluence',
             preChime: isBull ? 'confluence' : 'bearish',
@@ -200,7 +188,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     } else if (score >= 35 && score <= 65) {
       lastAnnouncedDirectionRef.current = null;
     }
-  }, [calculation.composite]);
+  }, [calculation.composite, calculation.psychAnalysis?.regime]);
 
   // Slim 6px ring arc dimensions
   const radius = 46;
@@ -215,19 +203,19 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       : 'var(--gold-primary)';
 
   const factors = [
-    { label: 'Macro & Yields', value: calculation.macroVal },
-    { label: 'News Sentiment', value: calculation.sentimentVal },
-    { label: 'Technical Flow', value: calculation.techVal },
-    { label: 'COT Positioning', value: calculation.cotVal },
-    { label: 'Event Volatility', value: calculation.eventRiskVal },
+    { label: 'Macro & Yields (24%)', value: calculation.macroVal },
+    { label: 'Trader Psychology & Traps (22%)', value: calculation.psychologyVal },
+    { label: 'SMC Liquidity Flow (22%)', value: calculation.techVal },
+    { label: 'AI News Vector (18%)', value: calculation.sentimentVal },
+    { label: 'CFTC Institutional COT (14%)', value: calculation.cotVal },
   ];
 
   return (
     <div className="panel-card">
       <div className="panel-header">
         <span className="panel-title">
-          <Gauge size={13} />
-          CONFLUENCE BIAS METER
+          <Compass size={13} style={{ color: strokeColor }} />
+          INSTITUTIONAL CONFLUENCE &amp; MARKET BIAS
         </span>
         <span
           style={{
@@ -300,6 +288,84 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
             <span>RISK: {calculation.imminentEventWarning}</span>
           </div>
         )}
+      </div>
+
+      {/* Professional Trader Psychology Intelligence Box */}
+      <div
+        style={{
+          marginTop: '10px',
+          marginBottom: '10px',
+          padding: '10px',
+          background: 'rgba(15, 23, 42, 0.65)',
+          border: `1px solid ${calculation.psychAnalysis?.regimeType === 'BULL' ? 'rgba(16, 185, 129, 0.25)' : calculation.psychAnalysis?.regimeType === 'BEAR' ? 'rgba(244, 63, 94, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`,
+          borderRadius: 'var(--radius-sm)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <BrainCircuit size={12} style={{ color: strokeColor }} />
+            <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-main)' }}>
+              PRO TRADER PSYCHOLOGY
+            </span>
+          </div>
+          <span
+            style={{
+              fontSize: '9px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              padding: '1px 6px',
+              borderRadius: '3px',
+              background: calculation.psychAnalysis?.regimeType === 'BULL' ? 'var(--bull-bg)' : calculation.psychAnalysis?.regimeType === 'BEAR' ? 'var(--bear-bg)' : 'rgba(245, 158, 11, 0.1)',
+              color: strokeColor,
+              border: `1px solid ${calculation.psychAnalysis?.regimeType === 'BULL' ? 'var(--border-bull)' : calculation.psychAnalysis?.regimeType === 'BEAR' ? 'var(--border-bear)' : 'rgba(245, 158, 11, 0.3)'}`,
+            }}
+          >
+            {calculation.psychAnalysis?.regime}
+          </span>
+        </div>
+
+        {/* Desk Note Narrative */}
+        <div
+          style={{
+            fontSize: '11px',
+            lineHeight: 1.45,
+            color: 'var(--text-muted)',
+            fontStyle: 'normal',
+          }}
+        >
+          {calculation.psychAnalysis?.deskNote}
+        </div>
+
+        {/* Tactical Badges Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px', marginTop: '2px' }}>
+          {calculation.psychAnalysis?.badges?.map((b) => (
+            <div
+              key={b.label}
+              style={{
+                background: 'rgba(30, 41, 59, 0.5)',
+                padding: '5px 7px',
+                borderRadius: '3px',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1px',
+              }}
+            >
+              <span style={{ fontSize: '8.5px', textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.04em' }}>
+                {b.label}
+              </span>
+              <span style={{ fontSize: '10px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: b.color }}>
+                {b.value}
+              </span>
+              <span style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {b.detail}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Uniform Factor Progress Bars */}
