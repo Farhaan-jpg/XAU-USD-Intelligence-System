@@ -9,9 +9,64 @@ const YahooFinanceClass = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
 const config = require('../config');
 
-// Rolling price buffer — last 120 ticks (2.5s each = 5 min)
+// Time-sampled rolling price buffer — records snapshots every 2s for up to 4 hours (up to 7,200 points)
 const priceHistory = {};
-const BUFFER_SIZE = 120;
+const MAX_HISTORY_MS = 4 * 60 * 60 * 1000;
+
+function recordPriceSample(sym, price) {
+  if (!price || isNaN(price)) return;
+  const now = Date.now();
+  if (!priceHistory[sym]) priceHistory[sym] = [];
+  const hist = priceHistory[sym];
+  const last = hist[hist.length - 1];
+  if (!last || (now - last.ts >= 2000) || (Math.abs(price - last.price) / (last.price || 1)) > 0.0004) {
+    hist.push({ price, ts: now });
+    const cutoff = now - MAX_HISTORY_MS;
+    while (hist.length > 0 && hist[0].ts < cutoff) {
+      hist.shift();
+    }
+  }
+}
+
+function getChangeSince(sym, msAgo, currentPrice, high, low) {
+  const hist = priceHistory[sym];
+  if (!hist || hist.length === 0 || !currentPrice) {
+    return { ch: 0, chp: 0, open: currentPrice, close: currentPrice, high, low };
+  }
+  const now = Date.now();
+  const targetTs = now - msAgo;
+  let entry = hist.find((p) => p.ts >= targetTs);
+  if (!entry) entry = hist[0];
+  const diff = currentPrice - entry.price;
+  const pct = entry.price > 0 ? (diff / entry.price) * 100 : 0;
+  return {
+    ch: parseFloat(diff.toFixed(2)),
+    chp: parseFloat(pct.toFixed(2)),
+    open: entry.price,
+    close: currentPrice,
+    high,
+    low,
+  };
+}
+
+async function seedHistoricalPrices() {
+  try {
+    const queryOptions = {
+      period1: Math.floor((Date.now() - MAX_HISTORY_MS) / 1000),
+      interval: '5m',
+    };
+    const chart = await yahooFinance.chart('GC=F', queryOptions).catch(() => null);
+    if (chart && chart.quotes && chart.quotes.length > 0) {
+      if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
+      chart.quotes.forEach((q) => {
+        if (q.close && q.date) {
+          priceHistory['GC=F'].push({ price: parseFloat(q.close.toFixed(2)), ts: new Date(q.date).getTime() });
+        }
+      });
+      console.log(`[PRICE] Seeded ${chart.quotes.length} historical 5m bars for GC=F`);
+    }
+  } catch (_) {}
+}
 
 // Display metadata for each symbol
 const INSTRUMENT_META = {
@@ -156,40 +211,23 @@ class TVStreamer {
       const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
       const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(2)) : (existing.changeAbs || 0);
 
-      // Buffer
-      if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
-      priceHistory['GC=F'].push({ price: newPrice, ts: Date.now() });
-      if (priceHistory['GC=F'].length > BUFFER_SIZE) priceHistory['GC=F'].shift();
+      // Time-sampled buffer
+      recordPriceSample('GC=F', newPrice);
 
-      // Compute rolling interval changes from price history
-      const now = Date.now();
-      const getChangeSince = (msAgo) => {
-        const targetTs = now - msAgo;
-        const entry = priceHistory['GC=F'].find((p) => p.ts >= targetTs) || priceHistory['GC=F'][0];
-        if (!entry || !entry.price) return { ch: 0, chp: 0, open: newPrice, close: newPrice, high, low };
-        const diff = newPrice - entry.price;
-        const pct = entry.price > 0 ? (diff / entry.price) * 100 : 0;
-        return {
-          ch: parseFloat(diff.toFixed(2)),
-          chp: parseFloat(pct.toFixed(2)),
-          open: entry.price,
-          close: newPrice,
-          high,
-          low,
-        };
-      };
-
+      // Compute rolling interval changes from time-sampled price history
       this.intervalChanges = {
-        '1': getChangeSince(60 * 1000),
-        '5': getChangeSince(5 * 60 * 1000),
-        '15': getChangeSince(15 * 60 * 1000),
-        '60': getChangeSince(60 * 60 * 1000),
-        '240': getChangeSince(240 * 60 * 1000),
+        '1': getChangeSince('GC=F', 60 * 1000, newPrice, high, low),
+        '5': getChangeSince('GC=F', 5 * 60 * 1000, newPrice, high, low),
+        '15': getChangeSince('GC=F', 15 * 60 * 1000, newPrice, high, low),
+        '60': getChangeSince('GC=F', 60 * 60 * 1000, newPrice, high, low),
+        '240': getChangeSince('GC=F', 240 * 60 * 1000, newPrice, high, low),
         'D': { ch, chp, open, high, low, close: newPrice },
       };
 
-      const oldest = priceHistory['GC=F'][0]?.price;
-      const change5m = oldest ? ((newPrice - oldest) / oldest) * 100 : 0;
+      const change5m = this.intervalChanges['5']?.chp ?? 0;
+      const dayRange = Math.max(1, high - low);
+      const priceLocation = newPrice > 0 ? parseFloat(((newPrice - low) / dayRange).toFixed(4)) : 0.5;
+      const pivotP = parseFloat(((high + low + newPrice) / 3).toFixed(2));
 
       const goldData = {
         symbol: 'GC=F',
@@ -198,7 +236,7 @@ class TVStreamer {
         unit: 'USD/oz',
         correlation: 'primary',
         price: newPrice,
-        change5m: this.intervalChanges['5']?.chp !== undefined ? this.intervalChanges['5'].chp : parseFloat(change5m.toFixed(4)),
+        change5m: parseFloat(change5m.toFixed(4)),
         changeDay: chp,
         changeAbs: ch,
         bid,
@@ -206,6 +244,8 @@ class TVStreamer {
         high,
         low,
         open,
+        priceLocation,
+        pivotP,
         volume: v.volume || existing.volume || 0,
         direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
         updatedAt: new Date().toISOString(),
@@ -247,11 +287,9 @@ class TVStreamer {
       const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
       const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(2)) : (existing.changeAbs || 0);
 
-      if (!priceHistory['SI=F']) priceHistory['SI=F'] = [];
-      priceHistory['SI=F'].push({ price: newPrice, ts: Date.now() });
-      if (priceHistory['SI=F'].length > BUFFER_SIZE) priceHistory['SI=F'].shift();
-      const oldest = priceHistory['SI=F'][0]?.price;
-      const change5m = oldest ? ((newPrice - oldest) / oldest) * 100 : 0;
+      recordPriceSample('SI=F', newPrice);
+      const change5mEntry = getChangeSince('SI=F', 5 * 60 * 1000, newPrice, high, low);
+      const change5m = change5mEntry.chp;
 
       const silverData = {
         symbol: 'SI=F',
@@ -305,11 +343,9 @@ class TVStreamer {
       const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
       const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(decimals)) : (existing.changeAbs || 0);
 
-      if (!priceHistory[targetSymbol]) priceHistory[targetSymbol] = [];
-      priceHistory[targetSymbol].push({ price: newPrice, ts: Date.now() });
-      if (priceHistory[targetSymbol].length > BUFFER_SIZE) priceHistory[targetSymbol].shift();
-      const oldest = priceHistory[targetSymbol][0]?.price;
-      const change5m = oldest ? ((newPrice - oldest) / oldest) * 100 : 0;
+      recordPriceSample(targetSymbol, newPrice);
+      const change5mEntry = getChangeSince(targetSymbol, 5 * 60 * 1000, newPrice, high, low);
+      const change5m = change5mEntry.chp;
       const meta = INSTRUMENT_META[targetSymbol] || {};
 
       latestPrices[targetSymbol] = {
@@ -504,11 +540,9 @@ async function fetchAllPrices() {
 
     if (liveGold?.price) {
       const goldPrice = liveGold.price;
-      if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
-      priceHistory['GC=F'].push({ price: goldPrice, ts: Date.now() });
-      if (priceHistory['GC=F'].length > BUFFER_SIZE) priceHistory['GC=F'].shift();
-      const oldest = priceHistory['GC=F'][0]?.price;
-      const change5m = oldest ? ((goldPrice - oldest) / oldest) * 100 : 0;
+      recordPriceSample('GC=F', goldPrice);
+      const change5mEntry = getChangeSince('GC=F', 5 * 60 * 1000, goldPrice, liveGold.high, liveGold.low);
+      const change5m = change5mEntry.chp;
 
       const prevIntervals = latestPrices['GC=F']?.intervals || {};
       const changeDayVal = liveGold.changeDay || (latestPrices['GC=F']?.changeDay || 0);
@@ -549,11 +583,9 @@ async function fetchAllPrices() {
 
     if (liveSilver?.price) {
       const silverPrice = liveSilver.price;
-      if (!priceHistory['SI=F']) priceHistory['SI=F'] = [];
-      priceHistory['SI=F'].push({ price: silverPrice, ts: Date.now() });
-      if (priceHistory['SI=F'].length > BUFFER_SIZE) priceHistory['SI=F'].shift();
-      const oldest = priceHistory['SI=F'][0]?.price;
-      const change5m = oldest ? ((silverPrice - oldest) / oldest) * 100 : 0;
+      recordPriceSample('SI=F', silverPrice);
+      const change5mEntry = getChangeSince('SI=F', 5 * 60 * 1000, silverPrice, liveSilver.high, liveSilver.low);
+      const change5m = change5mEntry.chp;
 
       const silverData = {
         symbol: 'SI=F',
@@ -599,13 +631,9 @@ async function fetchAllPrices() {
     const currentPrice = (hasRecentWsTick && existing.price) ? existing.price : (quote?.regularMarketPrice || existing.price || 0);
     if (currentPrice <= 0) return;
 
-    if (!priceHistory[symbol]) priceHistory[symbol] = [];
-    priceHistory[symbol].push({ price: currentPrice, ts: Date.now() });
-    if (priceHistory[symbol].length > BUFFER_SIZE) priceHistory[symbol].shift();
-
-    const buf = priceHistory[symbol];
-    const oldest = buf[0]?.price;
-    const change5m = oldest ? ((currentPrice - oldest) / oldest) * 100 : (existing.change5m || 0);
+    recordPriceSample(symbol, currentPrice);
+    const change5mEntry = getChangeSince(symbol, 5 * 60 * 1000, currentPrice, currentPrice, currentPrice);
+    const change5m = change5mEntry.chp;
     const meta = INSTRUMENT_META[symbol] || {};
     const changeDay = quote?.regularMarketChangePercent !== undefined 
       ? parseFloat(quote.regularMarketChangePercent.toFixed(2)) 
@@ -662,6 +690,9 @@ function start() {
       'TVC:USOIL',
     ]);
   }
+
+  // Seed historical chart bars if available
+  seedHistoricalPrices();
 
   // Immediate first poll for macro instruments
   poll();

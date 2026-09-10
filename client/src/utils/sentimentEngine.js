@@ -11,16 +11,38 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
   const dxy = prices['DX-Y.NYB'] || {};
   const us10y = prices['^TNX'] || {};
 
-  // 1. Gold Price Momentum Factor (25% weight)
+  const spotPrice = parseFloat(gold.price || 0);
+  const goldHigh = parseFloat(gold.high || spotPrice);
+  const goldLow = parseFloat(gold.low || spotPrice);
+  const goldOpen = parseFloat(gold.open || spotPrice);
+
+  const dayRange = Math.max(1, goldHigh - goldLow);
+  const priceLocation = spotPrice > 0 ? (spotPrice - goldLow) / dayRange : 0.5;
+  const pivotP = (goldHigh + goldLow + spotPrice) / 3;
+
+  // 1. Gold Price Multi-Horizon Momentum & SMC Location Factor (25% weight)
   const goldChg5m = parseFloat(gold.change5m || 0);
+  const goldChg15m = parseFloat(gold.intervals?.['15']?.chp ?? goldChg5m);
+  const goldChg1h = parseFloat(gold.intervals?.['60']?.chp ?? (goldChg5m * 1.5));
   const goldChgDay = parseFloat(gold.changeDay || 0);
-  // Normal session bounds: 5m moves +/-0.3%, day moves +/-1.2%
-  const m5 = Math.max(-25, Math.min(25, goldChg5m * 35));
-  const mDay = Math.max(-20, Math.min(20, goldChgDay * 10));
-  const momentumScore = Math.max(10, Math.min(90, Math.round(50 + m5 + mDay)));
+
+  // Short-term and session momentum
+  const shortTerm = (goldChg5m * 24) + (goldChg15m * 14);
+  const macroSession = (goldChgDay * 12) + (goldChg1h * 8);
+
+  // Auction location impact: price near session lows (-18 to +18)
+  const locDelta = (priceLocation - 0.5) * 36;
+
+  // Session initiative: trading below open confirms intraday sell initiative
+  const initDelta = goldOpen > 0 ? (spotPrice < goldOpen ? -6 : 4) : 0;
+
+  // Central Pivot relation: trading below central pivot P confirms bearish flow
+  const pivotDelta = spotPrice > 0 && pivotP > 0 ? (spotPrice < pivotP ? -5 : 3) : 0;
+
+  const rawMomentum = 50 + shortTerm + macroSession + locDelta + initDelta + pivotDelta;
+  const momentumScore = Math.max(10, Math.min(90, Math.round(rawMomentum)));
 
   // 2. Inverse Dollar & Yield Factor (25% weight)
-  // Calibrated: yield changes of +/-1.5% and DXY changes of +/-0.6% map within +/-35 pts around baseline 50
   const dxyChg5m = parseFloat(dxy.change5m || 0);
   const dxyChgDay = parseFloat(dxy.changeDay || 0);
   const yldChg5m = parseFloat(us10y.change5m || 0);
@@ -65,7 +87,6 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
     const minsUntil = (eventTime - nowMs) / 60000;
 
     if (minsUntil > 0 && minsUntil <= 60) {
-      // Approaching high-impact event creates safe-haven hedging demand
       eventScore = 72;
     } else if (minsUntil > 60 && minsUntil <= 180) {
       eventScore = 60;
@@ -84,13 +105,26 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
     }
   }
 
-  // 5. Speculator COT & Crowd Positioning (15% weight)
+  // 5. Speculator COT Contextualized Positioning (15% weight)
+  // Professional institutional interpretation:
+  // When price is in a sell trend / breakdown into discount or below open,
+  // high Managed Money net long (87%) represents VULNERABLE LONG LIQUIDATION RISK (fuel for cascades).
+  // When price is in an uptrend, high spec net long confirms trend momentum.
   const cotBias = cotData?.managedMoney?.biasPct ?? 70;
   const retailLong = cotData?.retailSentiment?.longPct ?? 60;
-  // Professional contrarian view: Institutional managed money long is positive,
-  // but if retail crowd is overwhelmingly long (>65%), crowd greed requires contrarian discounting.
-  const contrarianCrowdFactor = 100 - retailLong;
-  const cotScore = Math.max(15, Math.min(85, Math.round(cotBias * 0.65 + contrarianCrowdFactor * 0.35)));
+  const isPriceWeak = priceLocation <= 0.35 || (goldOpen > 0 && spotPrice < goldOpen);
+
+  let cotScore;
+  if (isPriceWeak) {
+    const liquidationPenalty = Math.round((cotBias - 50) * 0.45);
+    const retailTrapPenalty = retailLong > 55 ? Math.round((retailLong - 50) * 0.5) : 0;
+    cotScore = Math.max(15, Math.min(85, Math.round(50 - liquidationPenalty - retailTrapPenalty)));
+  } else if (priceLocation >= 0.65 && spotPrice >= goldOpen) {
+    cotScore = Math.max(15, Math.min(85, Math.round(cotBias * 0.7 + (100 - retailLong) * 0.3)));
+  } else {
+    const contrarianCrowdFactor = 100 - retailLong;
+    cotScore = Math.max(25, Math.min(75, Math.round(cotBias * 0.5 + contrarianCrowdFactor * 0.5)));
+  }
 
   // 6. Weighted Composite (0 - 100)
   const composite = Math.max(
@@ -117,10 +151,10 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
     classification = 'SAFE-HAVEN ACCUMULATION';
     themeColor = 'var(--bull-primary)';
   } else if (composite <= 25) {
-    classification = 'EXTREME RISK-OFF / DOLLAR FLIGHT';
+    classification = 'EXTREME RISK-OFF / DOWNSIDE LIQUIDATION';
     themeColor = 'var(--bear-primary)';
   } else if (composite <= 44) {
-    classification = 'BEARISH FEAR / YIELD PRESSURE';
+    classification = 'BEARISH FEAR / DOWNSIDE PRESSURE';
     themeColor = 'var(--bear-primary)';
   }
 
@@ -150,74 +184,111 @@ export function analyzeTraderPsychology({ prices = {}, newsFeed = [], calendarDa
   const spotPrice = parseFloat(gold.price || 0);
   const goldHigh = parseFloat(gold.high || spotPrice);
   const goldLow = parseFloat(gold.low || spotPrice);
+  const goldOpen = parseFloat(gold.open || spotPrice);
 
   const dayRange = Math.max(1, goldHigh - goldLow);
   const priceLocation = spotPrice > 0 ? (spotPrice - goldLow) / dayRange : 0.5; // 0 = low, 1 = high
+  const pivotP = (goldHigh + goldLow + spotPrice) / 3;
+
+  const goldChg5m = parseFloat(gold.change5m || 0);
+  const goldChgDay = parseFloat(gold.changeDay || 0);
 
   const retailLong = cotData?.retailSentiment?.longPct ?? 62;
   const retailShort = cotData?.retailSentiment?.shortPct ?? (100 - retailLong);
   const fearGreed = calculateFearGreed({ prices, newsFeed, calendarData, cotData });
   const fearGreedScore = fearGreed.score;
 
-  // 1. Diagnose Auction Zone (Discount vs Premium)
+  // 1. Diagnose Auction Zone (Discount vs Premium vs Equilibrium)
+  const isDeepDiscount = priceLocation <= 0.20;
   const isDiscount = priceLocation <= 0.40;
+  const isDeepPremium = priceLocation >= 0.80;
   const isPremium = priceLocation >= 0.60;
-  const isEquilibrium = !isDiscount && !isPremium;
+  const isEquilibrium = priceLocation > 0.40 && priceLocation < 0.60;
 
-  // 2. Diagnose Retail Crowd Trap
-  // Retail herd heavily long (>64%): trapped buyers vulnerable to institutional liquidation runs
-  // Retail herd heavily short (<38% long / >62% short): trapped sellers fuel short squeezes
+  // 2. Diagnose Retail Crowd Trap State
   let crowdTrapState = 'BALANCED';
-
-  if (retailLong >= 65) {
+  if (retailLong >= 58 && (isDiscount || isDeepDiscount)) {
+    // Retail herd aggressively buying the dip into a selloff -> trapped long stops
+    crowdTrapState = 'TRAPPED_DIP_BUYERS';
+  } else if (retailLong >= 65 && (isPremium || isDeepPremium)) {
+    // Retail buying breakout resistance at highs
     crowdTrapState = 'RETAIL_LONG_TRAP';
   } else if (retailLong <= 38) {
+    // Retail shorting momentum
     crowdTrapState = 'SHORT_SQUEEZE_FUEL';
   } else if (retailLong >= 60) {
     crowdTrapState = 'ELEVATED_CROWD_LONGS';
   }
 
   // 3. Synthesize Professional Trader Psychology Regime
-  let regime = 'INSTITUTIONAL EQUILIBRIUM';
+  let regime = 'ORDER FLOW ROTATION / FAIR VALUE EQUILIBRIUM';
   let regimeType = 'NEUTRAL'; // 'BULL' | 'BEAR' | 'NEUTRAL'
   let deskNote = '';
   let psychologyScore = 50;
 
-  if (fearGreedScore >= 78 && isPremium) {
+  const isAggressiveSellTrend =
+    (isDeepDiscount || (isDiscount && (spotPrice < goldOpen || goldChgDay < 0 || goldChg5m < -0.04))) &&
+    (crowdTrapState === 'TRAPPED_DIP_BUYERS' || fearGreedScore <= 46 || goldChgDay <= -0.15 || (spotPrice < pivotP && goldChg5m <= 0));
+
+  const isAggressiveBuyTrend =
+    (isDeepPremium || (isPremium && (spotPrice >= goldOpen || goldChgDay > 0 || goldChg5m > 0.04))) &&
+    (crowdTrapState === 'SHORT_SQUEEZE_FUEL' || fearGreedScore >= 58 || goldChgDay >= 0.15);
+
+  if (isAggressiveSellTrend) {
+    regime = 'AGGRESSIVE DOWNSIDE EXPANSION / LONG LIQUIDATION CASCADE';
+    regimeType = 'BEAR';
+    psychologyScore = 20;
+    deskNote = `Aggressive institutional sell program active. Price is expanding downward into deep discount (${(priceLocation * 100).toFixed(0)}% of daily range) below session open. Retail dip-buyers (${retailLong}% long) are trapped in an institutional stop flush targeting Sell-Side Liquidity (SSL) below session lows. Primary institutional bias: Sell counter-trend bounces; avoid catching falling knives.`;
+  } else if (isAggressiveBuyTrend) {
+    regime = 'AGGRESSIVE UPSIDE EXPANSION / SHORT SQUEEZE BREAKOUT';
+    regimeType = 'BULL';
+    psychologyScore = 80;
+    deskNote = `High-conviction upside expansion underway with price holding daily premium (${(priceLocation * 100).toFixed(0)}% of range). Trapped retail shorts (${retailShort}%) are fueling an institutional buy-side liquidity run above session highs. Primary bias: Buy shallow pullbacks in line with smart money order flow.`;
+  } else if (fearGreedScore >= 78 && isPremium) {
     regime = 'SAFE-HAVEN CLIMAX / DISTRIBUTION WATCH';
     regimeType = 'BEAR';
-    psychologyScore = 42; // Contrarian caution at extremes
+    psychologyScore = 38;
     deskNote = `Gold is extending into Extreme Safe-Haven Greed (${fearGreedScore}/100) while trading in daily Premium (${(priceLocation * 100).toFixed(0)}%). Institutional prop desks do NOT chase highs here. Look for smart money distribution or fakeout rejections at resistance before considering long re-entries.`;
-  } else if (fearGreedScore >= 58 && isDiscount) {
-    regime = 'INSTITUTIONAL ACCUMULATION (DISCOUNT ENGINE)';
-    regimeType = 'BULL';
-    psychologyScore = 78;
-    deskNote = `High-conviction safe-haven accumulation active (${fearGreedScore}/100) with price discounted at ${(priceLocation * 100).toFixed(0)}% of daily range. Macro yields are pressured. Smart money is actively absorbing retail liquidity below equilibrium. Primary institutional bias: Buy dips into discount order blocks.`;
   } else if (crowdTrapState === 'RETAIL_LONG_TRAP' && isPremium) {
     regime = 'BULL TRAP / LIQUIDITY SWEEP AT HIGHS';
     regimeType = 'BEAR';
-    psychologyScore = 34;
+    psychologyScore = 32;
     deskNote = `Retail crowd is heavily net long (${retailLong}%) buying into resistance at the top of the session range. Institutional algorithms frequently engineer Buy-Side Liquidity sweeps above highs to trigger retail breakout stops before pulling bids. Professional traders fade breakout FOMO.`;
   } else if (crowdTrapState === 'SHORT_SQUEEZE_FUEL' && (isDiscount || isEquilibrium)) {
     regime = 'BEAR TRAP / SHORT SQUEEZE EXPANSION';
     regimeType = 'BULL';
     psychologyScore = 74;
     deskNote = `Retail crowd is heavily short (${retailShort}%) attempting to fade gold momentum. Trapped retail stops stacked above session highs create a liquidity magnet for institutional market makers. Professional traders align with the short squeeze flow.`;
-  } else if (fearGreedScore >= 58) {
+  } else if (fearGreedScore >= 60 && isDiscount && goldChg5m >= 0 && spotPrice >= goldLow + dayRange * 0.15) {
+    regime = 'INSTITUTIONAL ACCUMULATION (DISCOUNT ENGINE)';
+    regimeType = 'BULL';
+    psychologyScore = 74;
+    deskNote = `Safe-haven accumulation active (${fearGreedScore}/100) with price discounted at ${(priceLocation * 100).toFixed(0)}% of daily range and finding a floor. Macro yields are pressured. Smart money is absorbing retail liquidity. Primary bias: Buy dips into discount order blocks.`;
+  } else if (fearGreedScore >= 58 && spotPrice >= goldOpen) {
     regime = 'SAFE-HAVEN EXPANSION FLOW';
     regimeType = 'BULL';
     psychologyScore = 68;
     deskNote = `Steady institutional safe-haven bid supporting bullion (${fearGreedScore}/100). Real yields and dollar strength are contained. Professional traders maintain bullish trend alignment, prioritizing patient pullback execution.`;
-  } else if (fearGreedScore <= 38) {
+  } else if (fearGreedScore <= 38 || (priceLocation <= 0.35 && spotPrice < goldOpen)) {
     regime = 'YIELD COMPRESSION / MACRO HEADWINDS';
     regimeType = 'BEAR';
-    psychologyScore = 32;
-    deskNote = `Macro headwinds dominant (${fearGreedScore}/100). Treasury yields or the US Dollar are attracting capital away from non-yielding bullion. Prop desks favor selling counter-trend rallies until institutional accumulation forms a clear base.`;
-  } else {
-    regime = 'ORDER FLOW ROTATION / RANGEBOUND';
+    psychologyScore = 28;
+    deskNote = `Macro headwinds dominant (${fearGreedScore}/100). Treasury yields or the US Dollar are attracting capital away from non-yielding bullion. Price is trading weak in discount (${(priceLocation * 100).toFixed(0)}% of range). Prop desks favor selling counter-trend rallies until institutional accumulation forms a clear base.`;
+  } else if (isEquilibrium) {
+    regime = 'ORDER FLOW ROTATION / FAIR VALUE EQUILIBRIUM';
     regimeType = 'NEUTRAL';
     psychologyScore = 50;
-    deskNote = `Market is oscillating in fair value equilibrium (${(priceLocation * 100).toFixed(0)}% of day range). Order flow is two-sided with balanced institutional participation. Wait for liquidity runs outside Asian session boundaries before committing capital.`;
+    deskNote = `Market is oscillating in fair value equilibrium (${(priceLocation * 100).toFixed(0)}% of day range). Order flow is two-sided with balanced institutional participation. Wait for liquidity runs outside session boundaries before committing capital.`;
+  } else if (priceLocation < 0.40) {
+    regime = 'DISCOUNT DRIFT / DEFENSIVE BEAR FLOW';
+    regimeType = 'BEAR';
+    psychologyScore = 36;
+    deskNote = `Bullion is hovering in discount (${(priceLocation * 100).toFixed(0)}% of day range) under modest selling pressure. Downside bias remains favored while price is capped below daily central pivot.`;
+  } else {
+    regime = 'PREMIUM EXPANSION / BULLISH ROTATION';
+    regimeType = 'BULL';
+    psychologyScore = 64;
+    deskNote = `Bullion is maintaining premium pricing (${(priceLocation * 100).toFixed(0)}% of day range) above session equilibrium. Institutional desks look to accumulate shallow pullbacks.`;
   }
 
   // 4. Tactical Execution Badges
@@ -225,14 +296,40 @@ export function analyzeTraderPsychology({ prices = {}, newsFeed = [], calendarDa
     {
       label: 'CROWD SENTIMENT',
       value: `${retailLong}% LONG / ${retailShort}% SHORT`,
-      detail: crowdTrapState === 'RETAIL_LONG_TRAP' ? 'Trap: Fading Herd Longs' : crowdTrapState === 'SHORT_SQUEEZE_FUEL' ? 'Squeeze: Trapped Shorts' : 'Balanced Exposure',
-      color: crowdTrapState === 'RETAIL_LONG_TRAP' ? 'var(--bear-primary)' : crowdTrapState === 'SHORT_SQUEEZE_FUEL' ? 'var(--bull-primary)' : 'var(--gold-primary)',
+      detail: crowdTrapState === 'TRAPPED_DIP_BUYERS'
+        ? 'Trap: Trapped Dip-Buyers'
+        : crowdTrapState === 'RETAIL_LONG_TRAP'
+        ? 'Trap: Fading Herd Longs'
+        : crowdTrapState === 'SHORT_SQUEEZE_FUEL'
+        ? 'Squeeze: Trapped Shorts'
+        : 'Balanced Exposure',
+      color: crowdTrapState === 'TRAPPED_DIP_BUYERS' || crowdTrapState === 'RETAIL_LONG_TRAP'
+        ? 'var(--bear-primary)'
+        : crowdTrapState === 'SHORT_SQUEEZE_FUEL'
+        ? 'var(--bull-primary)'
+        : 'var(--gold-primary)',
     },
     {
       label: 'AUCTION PRICING',
-      value: isDiscount ? 'DISCOUNT ZONE' : isPremium ? 'PREMIUM ZONE' : 'EQUILIBRIUM',
+      value: isDeepDiscount
+        ? 'EXTREME DISCOUNT'
+        : isDiscount
+        ? 'DISCOUNT ZONE'
+        : isDeepPremium
+        ? 'EXTREME PREMIUM'
+        : isPremium
+        ? 'PREMIUM ZONE'
+        : 'EQUILIBRIUM',
       detail: `${(priceLocation * 100).toFixed(0)}% of Daily Range`,
-      color: isDiscount ? 'var(--bull-primary)' : isPremium ? 'var(--bear-primary)' : 'var(--cyan-primary)',
+      color: isDeepDiscount || (isDiscount && regimeType === 'BEAR')
+        ? 'var(--bear-primary)'
+        : isDiscount
+        ? 'var(--bull-primary)'
+        : isDeepPremium
+        ? 'var(--gold-primary)'
+        : isPremium
+        ? 'var(--bull-primary)'
+        : 'var(--cyan-primary)',
     },
     {
       label: 'FEAR & GREED',
@@ -242,8 +339,16 @@ export function analyzeTraderPsychology({ prices = {}, newsFeed = [], calendarDa
     },
     {
       label: 'INSTITUTIONAL TACTIC',
-      value: regimeType === 'BULL' ? 'ACCUMULATE DISCOUNTS' : regimeType === 'BEAR' ? 'FADE PREMIUM RALLIES' : 'PATIENT LIQUIDITY WAIT',
-      detail: regimeType === 'BULL' ? 'Protect stops below SSL' : regimeType === 'BEAR' ? 'Target sell liquidity pools' : 'Avoid mid-range chop',
+      value: regimeType === 'BULL'
+        ? 'ACCUMULATE DISCOUNTS'
+        : regimeType === 'BEAR'
+        ? (isDeepDiscount ? 'FADE BOUNCES / TARGET SSL' : 'SELL PULLBACKS')
+        : 'PATIENT LIQUIDITY WAIT',
+      detail: regimeType === 'BULL'
+        ? 'Protect stops below SSL'
+        : regimeType === 'BEAR'
+        ? 'Target sell liquidity pools'
+        : 'Avoid mid-range chop',
       color: regimeType === 'BULL' ? 'var(--bull-primary)' : regimeType === 'BEAR' ? 'var(--bear-primary)' : 'var(--text-dim)',
     },
   ];

@@ -22,8 +22,17 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const goldLow = parseFloat(gold.low || spotPrice);
     const goldOpen = parseFloat(gold.open || spotPrice);
 
+    const dayRange = Math.max(1, goldHigh - goldLow);
+    const priceLocation = spotPrice > 0 ? (spotPrice - goldLow) / dayRange : 0.5;
+    const pivotP = (goldHigh + goldLow + spotPrice) / 3;
+    const s1 = (2 * pivotP) - goldHigh;
+    const r1 = (2 * pivotP) - goldLow;
+
     const goldChg5m = parseFloat(gold.change5m || 0);
+    const goldChg15m = parseFloat(gold.intervals?.['15']?.chp ?? goldChg5m);
+    const goldChg1h = parseFloat(gold.intervals?.['60']?.chp ?? (goldChg5m * 1.5));
     const goldChgDay = parseFloat(gold.changeDay || 0);
+
     const dxyChg5m = parseFloat(dxy.change5m || 0);
     const dxyChgDay = parseFloat(dxy.changeDay || 0);
     const us10yChg5m = parseFloat(us10y.change5m || 0);
@@ -34,7 +43,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const oilChg5m = parseFloat(oil.change5m || 0);
     const oilChgDay = parseFloat(oil.changeDay || 0);
 
-    // 1. Macro Dollar, Yields & Energy Intermarket Vector (24% weight)
+    // 1. Macro Dollar, Yields & Energy Intermarket Vector
     const dxyImpulse = (dxyChg5m * 0.65) + (dxyChgDay * 0.35);
     const us10yImpulse = (us10yChg5m * 0.65) + (us10yChgDay * 0.35);
     const us02yImpulse = us02yChg5m;
@@ -50,26 +59,66 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
 
     const macroVal = Math.max(10, Math.min(90, Math.round(50 - macroDrag)));
 
-    // 2. Trader Psychology & Crowd Contrarian Traps (22% weight)
+    // 2. Trader Psychology & Crowd Contrarian Traps
     const psychAnalysis = analyzeTraderPsychology({ prices, newsFeed, calendarData, cotData });
     const psychologyVal = psychAnalysis.psychologyScore;
 
-    // 3. Technical Velocity & SMC Auction Structure (22% weight)
-    const dayRange = Math.max(1, goldHigh - goldLow);
-    const priceLocation = spotPrice > 0 ? (spotPrice - goldLow) / dayRange : 0.5;
-    const sessionInitiative = goldOpen > 0 && spotPrice >= goldOpen ? 1 : -1;
+    // 3. Technical Velocity & SMC Auction Structure
     const silverBetaSpread = silverChg5m - goldChg5m;
+    const shortDelta = (goldChg5m * 32) + (goldChg15m * 18);
+    const dayDelta = (goldChgDay * 12) + (goldChg1h * 8);
+
+    // Non-linear auction location impact (steep acceleration at range extremes)
+    let locDelta = 0;
+    if (priceLocation <= 0.15) {
+      locDelta = -18 - (0.15 - priceLocation) * 40;
+    } else if (priceLocation <= 0.35) {
+      locDelta = -10 - (0.35 - priceLocation) * 40;
+    } else if (priceLocation >= 0.85) {
+      locDelta = 18 + (priceLocation - 0.85) * 40;
+    } else if (priceLocation >= 0.65) {
+      locDelta = 10 + (priceLocation - 0.65) * 40;
+    } else {
+      locDelta = (priceLocation - 0.5) * 20;
+    }
+
+    // Floor Pivot Confluence
+    let pivotDelta = 0;
+    if (spotPrice > 0 && pivotP > 0) {
+      if (spotPrice <= s1) {
+        pivotDelta = -10;
+      } else if (spotPrice < pivotP) {
+        pivotDelta = -6;
+      } else if (spotPrice >= r1) {
+        pivotDelta = 10;
+      } else if (spotPrice > pivotP) {
+        pivotDelta = 6;
+      }
+    }
+
+    // Session initiative
+    const sessionInitiative = goldOpen > 0 ? (spotPrice < goldOpen ? -8 : 6) : 0;
+
+    // Multi-timeframe trend alignment
+    let alignmentDelta = 0;
+    if (goldChg5m < 0 && goldChg15m < 0 && (goldChgDay < 0 || spotPrice < goldOpen)) {
+      alignmentDelta = -8;
+    } else if (goldChg5m > 0 && goldChg15m > 0 && (goldChgDay > 0 || spotPrice >= goldOpen)) {
+      alignmentDelta = 8;
+    }
 
     const techDelta =
-      (goldChg5m * 28) +
-      (goldChgDay * 8) +
-      (silverBetaSpread * 6) +
-      ((priceLocation - 0.5) * 16) +
-      (sessionInitiative * 4);
+      shortDelta +
+      dayDelta +
+      locDelta +
+      pivotDelta +
+      sessionInitiative +
+      alignmentDelta +
+      (silverBetaSpread * 5);
 
     const techVal = Math.max(10, Math.min(90, Math.round(50 + techDelta)));
 
-    // 4. AI News Sentiment with Recency Decay & Catalyst Risk (18% weight)
+    // 4. AI News Sentiment with Recency Decay & Catalyst Risk
     const recent = newsFeed.slice(0, 25);
     let bullWeight = 0;
     let bearWeight = 0;
@@ -107,20 +156,44 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       }
     }
 
-    // 5. CFTC COT Institutional Speculators (14% weight)
-    const cotVal = Math.max(15, Math.min(85, Math.round(cotData?.managedMoney?.biasPct ?? 70)));
+    // 5. CFTC COT Institutional Contextualized Flow
+    // When market is in a sell trend / breakdown into discount or below open,
+    // heavy Speculator Longs (87%) indicate VULNERABLE LONG LIQUIDATION RISK,
+    // and Commercial Hedgers (81% short) are selling.
+    const rawCotBias = cotData?.managedMoney?.biasPct ?? 70;
+    const retailLongPct = cotData?.retailSentiment?.longPct ?? 60;
 
-    // Composite Calculation (Weighted 5 Institutional Pillars)
+    let cotVal;
+    if (priceLocation <= 0.35 || (goldOpen > 0 && spotPrice < goldOpen)) {
+      const liquidationOverhang = Math.round((rawCotBias - 50) * 0.5);
+      const retailTrapDrag = retailLongPct > 55 ? Math.round((retailLongPct - 50) * 0.4) : 0;
+      cotVal = Math.max(15, Math.min(85, Math.round(50 - liquidationOverhang - retailTrapDrag)));
+    } else if (priceLocation >= 0.65 && spotPrice >= goldOpen) {
+      cotVal = Math.max(15, Math.min(85, Math.round(rawCotBias * 0.75 + (100 - retailLongPct) * 0.25)));
+    } else {
+      cotVal = Math.max(25, Math.min(75, Math.round(rawCotBias * 0.5 + (100 - retailLongPct) * 0.5)));
+    }
+
+    // 6. Dynamic Trend-Adaptive Composite Calculation
+    // When technical order flow indicates a high-momentum trend,
+    // live technical order flow & trader psychology take dominant authority over lagging pillars.
+    const isTrendDriven = techVal <= 32 || techVal >= 68;
+    const wTech = isTrendDriven ? 0.35 : 0.22;
+    const wPsych = isTrendDriven ? 0.30 : 0.22;
+    const wMacro = isTrendDriven ? 0.15 : 0.24;
+    const wNews = isTrendDriven ? 0.10 : 0.18;
+    const wCot = isTrendDriven ? 0.10 : 0.14;
+
     const composite = Math.max(
       0,
       Math.min(
         100,
         Math.round(
-          (macroVal * 0.24) +
-          (psychologyVal * 0.22) +
-          (techVal * 0.22) +
-          (sentimentVal * 0.18) +
-          (cotVal * 0.14)
+          (macroVal * wMacro) +
+          (psychologyVal * wPsych) +
+          (techVal * wTech) +
+          (sentimentVal * wNews) +
+          (cotVal * wCot)
         )
       )
     );
@@ -128,13 +201,13 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     let verdict = 'NEUTRAL CONVICTION';
     let verdictClass = 'neutral';
 
-    if (composite >= 74) {
+    if (composite >= 72) {
       verdict = 'STRONG BUY';
       verdictClass = 'bull';
     } else if (composite >= 58) {
       verdict = 'MODERATE BUY';
       verdictClass = 'bull';
-    } else if (composite <= 26) {
+    } else if (composite <= 28) {
       verdict = 'STRONG SELL';
       verdictClass = 'bear';
     } else if (composite <= 42) {
@@ -151,6 +224,12 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       techVal,
       sentimentVal,
       cotVal,
+      isTrendDriven,
+      wTech,
+      wPsych,
+      wMacro,
+      wNews,
+      wCot,
       imminentEventWarning,
       psychAnalysis,
     };
@@ -166,8 +245,8 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     const tenMinutes = 10 * 60 * 1000;
 
     let newDirection = null;
-    if (score >= 76) newDirection = 'STRONG_BUY';
-    else if (score <= 24) newDirection = 'STRONG_SELL';
+    if (score >= 72) newDirection = 'STRONG_BUY';
+    else if (score <= 28) newDirection = 'STRONG_SELL';
 
     if (newDirection && newDirection !== lastAnnouncedDirectionRef.current) {
       if (now - lastAlertTimeRef.current >= tenMinutes) {
@@ -185,7 +264,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
           }
         );
       }
-    } else if (score >= 35 && score <= 65) {
+    } else if (score >= 38 && score <= 62) {
       lastAnnouncedDirectionRef.current = null;
     }
   }, [calculation.composite, calculation.psychAnalysis?.regime]);
@@ -202,12 +281,13 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       ? 'var(--bear-primary)'
       : 'var(--gold-primary)';
 
+  const isTrend = calculation.isTrendDriven;
   const factors = [
-    { label: 'Macro & Yields (24%)', value: calculation.macroVal },
-    { label: 'Trader Psychology & Traps (22%)', value: calculation.psychologyVal },
-    { label: 'SMC Liquidity Flow (22%)', value: calculation.techVal },
-    { label: 'AI News Vector (18%)', value: calculation.sentimentVal },
-    { label: 'CFTC Institutional COT (14%)', value: calculation.cotVal },
+    { label: `SMC Liquidity Flow (${isTrend ? '35%' : '22%'})`, value: calculation.techVal },
+    { label: `Trader Psychology & Traps (${isTrend ? '30%' : '22%'})`, value: calculation.psychologyVal },
+    { label: `Macro & Yields (${isTrend ? '15%' : '24%'})`, value: calculation.macroVal },
+    { label: `AI News Vector (${isTrend ? '10%' : '18%'})`, value: calculation.sentimentVal },
+    { label: `CFTC Institutional COT (${isTrend ? '10%' : '14%'})`, value: calculation.cotVal },
   ];
 
   return (

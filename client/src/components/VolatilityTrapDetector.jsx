@@ -36,9 +36,9 @@ export default function VolatilityTrapDetector({ prices = {} }) {
           delta: `${isUp ? '+' : ''}${delta.toFixed(2)}`,
           speed: `${absDelta.toFixed(1)} USD in <60s`,
           advice: isUp
-            ? 'Caution: Chasing long here has low R:R. Watch for exhaustion wick retest or rejection back into equilibrium.'
-            : 'Caution: Retail stop run in progress. Watch for smart money absorption and rapid mean-reversion reclaim.',
-          color: isUp ? 'var(--bear-primary)' : 'var(--bull-primary)',
+            ? 'Caution: Rapid buying spike. High risk of exhaustion wick or mean-reversion pullbacks.'
+            : 'Caution: Rapid downside selling velocity. Institutional stop run / sell-side liquidity liquidation in progress.',
+          color: isUp ? 'var(--bull-primary)' : 'var(--bear-primary)',
           timestamp: new Date().toLocaleTimeString(),
         });
       }
