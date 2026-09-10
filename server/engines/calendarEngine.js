@@ -561,7 +561,7 @@ const VERIFIED_FOREX_FACTORY_EVENTS = [
     impact: 'HIGH',
     date: toUTC(16, 9, 2026, '11:30pm'),
     timeIST: '11:30pm',
-    dateIST: 'Wed Sep 9',
+    dateIST: 'Wed Sep 16',
     actual: '',
     forecast: '',
     previous: '',

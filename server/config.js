@@ -8,9 +8,9 @@ const required = ['OPENROUTER_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'
 
 const missing = required.filter((k) => !process.env[k]);
 if (missing.length > 0) {
-  console.error(`[CONFIG] ❌ Missing required environment variables: ${missing.join(', ')}`);
-  console.error('[CONFIG] Please copy .env.example to .env and fill in your credentials.');
-  process.exit(1);
+  console.warn(`[CONFIG] ⚠️  Missing environment variables: ${missing.join(', ')}`);
+  console.warn('[CONFIG] Telegram alerts and OpenRouter AI will be degraded. Add to .env or Render environment settings.');
+  // Non-fatal: dashboard core (prices, calendar, news) continues without these
 }
 
 const config = {
