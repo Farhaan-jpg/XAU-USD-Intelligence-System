@@ -4,14 +4,16 @@
 
 const config = require('../config');
 
-// Pre-compile patterns for performance
+// Pre-compile patterns for performance with strict word boundaries
 const GOLD_PATTERN = new RegExp(
-  config.goldKeywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+  config.goldKeywords
+    .map((k) => `\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+    .join('|'),
   'i'
 );
 
 // Hard exclusions — news that matches these is never gold-relevant
-const EXCLUSION_PATTERN = /sports|entertainment|celebrity|movie|music|game|football|cricket|bollywood|hollywood|weather|recipe|travel|fashion|lifestyle/i;
+const EXCLUSION_PATTERN = /\b(sports|entertainment|celebrity|movie|music|game|football|cricket|bollywood|hollywood|weather|recipe|travel|fashion|lifestyle)\b/i;
 
 /**
  * Returns true if the article is potentially relevant to XAU/USD
@@ -33,11 +35,12 @@ function isGoldRelevant(title, content = '') {
  * @returns {number}
  */
 function relevanceScore(title, content = '') {
-  const text = `${title} ${content}`.substring(0, 500).toLowerCase();
+  const text = `${title} ${content}`.substring(0, 500);
   const highValueTerms = ['fomc', 'cpi', 'nfp', 'federal reserve', 'rate decision', 'core pce', 'payroll', 'gold', 'xau'];
   let score = 0;
   for (const term of highValueTerms) {
-    if (text.includes(term)) score += 15;
+    const reg = new RegExp(`\\b${term}\\b`, 'i');
+    if (reg.test(text)) score += 15;
   }
   if (GOLD_PATTERN.test(text)) score += 10;
   return Math.min(score, 100);

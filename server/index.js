@@ -333,6 +333,11 @@ if (distPath) {
     }
     res.sendFile(path.join(distPath, 'index.html'));
   });
+} else {
+  console.warn('[SERVER] ⚠️ Production build not found at ../dist. Run `npm run build` to build client assets.');
+  app.get('/', (req, res) => {
+    res.send('<!DOCTYPE html><html><body style="font-family:sans-serif;background:#0f172a;color:#f8fafc;padding:40px;text-align:center;"><h2>XAU/USD Intelligence System Backend Active</h2><p style="color:#94a3b8;">Production frontend build not found. Run <code>npm run build</code>.</p><p><a href="/api/health" style="color:#38bdf8;">View API Health</a> | <a href="/api/prices" style="color:#38bdf8;">View Real-time Prices</a></p></body></html>');
+  });
 }
 
 // ─── Socket.io connection handling ────────────────────────────────────────────
