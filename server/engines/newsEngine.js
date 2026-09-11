@@ -10,6 +10,7 @@ const config = require('../config');
 const { isGoldRelevant, relevanceScore } = require('../utils/goldFilter');
 const aiOrchestrator = require('../utils/aiOrchestrator');
 const telegramEngine = require('./telegramEngine');
+const webhookEngine = require('./webhookEngine');
 const newsArchive = require('../utils/newsArchive');
 
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
@@ -215,10 +216,13 @@ function processFeedItems(rawItems) {
       io.emit('news_item', newsItem);
     }
 
-    // High-impact alert trigger
+    // High-impact alert trigger (Telegram + Discord / Slack Webhook)
     if (newsItem.impact === 'HIGH') {
       telegramEngine.sendNewsAlert(newsItem).catch((err) =>
         console.error('[NEWS] Telegram alert error:', err.message)
+      );
+      webhookEngine.sendNewsAlert(newsItem).catch((err) =>
+        console.warn('[NEWS] Webhook alert notice:', err.message)
       );
     }
 

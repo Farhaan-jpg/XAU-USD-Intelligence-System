@@ -25,6 +25,13 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [telegramChatId, setTelegramChatId] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
 
+  // Webhook State (Discord, Slack, Custom)
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookType, setWebhookType] = useState('discord');
+  const [webhookEnabled, setWebhookEnabled] = useState(true);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState(null);
+
   // Voice Settings State
   const [voiceSettings, setVoiceSettingsState] = useState(getVoiceSettings());
   const [voicesList, setVoicesList] = useState([]);
@@ -56,6 +63,11 @@ export default function SettingsModal({ isOpen, onClose }) {
           setTelegramToken(data.telegram.maskedToken || '');
           setTelegramChatId(data.telegram.chatId || '');
         }
+        if (data.webhook) {
+          setWebhookUrl(data.webhook.url || '');
+          setWebhookType(data.webhook.type || 'discord');
+          setWebhookEnabled(data.webhook.enabled !== false);
+        }
       })
       .catch((err) => console.error('Failed to load settings:', err))
       .finally(() => setLoading(false));
@@ -74,6 +86,9 @@ export default function SettingsModal({ isOpen, onClose }) {
         model: openrouterModel,
         telegramToken: telegramToken.includes('...') ? undefined : telegramToken,
         telegramChatId,
+        webhookUrl: webhookUrl.includes('...') ? undefined : webhookUrl,
+        webhookType,
+        webhookEnabled,
       };
 
       const res = await fetch('/api/settings', {
@@ -93,6 +108,27 @@ export default function SettingsModal({ isOpen, onClose }) {
       setSaveMessage(`Error: ${err.message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    setTestingWebhook(true);
+    setWebhookStatus(null);
+    try {
+      const res = await fetch('/api/settings/test-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl.includes('...') ? undefined : webhookUrl,
+          type: webhookType,
+        }),
+      });
+      const data = await res.json();
+      setWebhookStatus(data);
+    } catch (err) {
+      setWebhookStatus({ success: false, error: err.message });
+    } finally {
+      setTestingWebhook(false);
     }
   };
 
@@ -347,6 +383,79 @@ export default function SettingsModal({ isOpen, onClose }) {
                   {telegramStatus && (
                     <span style={{ fontSize: '11px', color: telegramStatus.success ? 'var(--bull-glow)' : 'var(--bear-glow)' }}>
                       {telegramStatus.success ? '✅ Test alert delivered!' : `❌ ${telegramStatus.error}`}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Webhooks Section (Discord / Slack / Custom) */}
+              <div
+                style={{
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#5865F2', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Send size={14} />
+                    INSTITUTIONAL WEBHOOKS (DISCORD / SLACK / CUSTOM)
+                  </span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={webhookEnabled}
+                      onChange={(e) => setWebhookEnabled(e.target.checked)}
+                      style={{ accentColor: '#5865F2' }}
+                    />
+                    <span>Enable Outbound Webhooks</span>
+                  </label>
+                </div>
+
+                <div className="calc-inputs-grid" style={{ gridTemplateColumns: '1fr 2fr' }}>
+                  <div className="calc-field">
+                    <label className="calc-label">WEBHOOK TYPE</label>
+                    <select
+                      className="calc-input"
+                      value={webhookType}
+                      onChange={(e) => setWebhookType(e.target.value)}
+                    >
+                      <option value="discord">Discord (Rich Embeds)</option>
+                      <option value="slack">Slack (Blocks API)</option>
+                      <option value="custom">Custom Webhook (JSON POST)</option>
+                    </select>
+                  </div>
+
+                  <div className="calc-field">
+                    <label className="calc-label">WEBHOOK TARGET URL</label>
+                    <input
+                      type="text"
+                      className="calc-input"
+                      value={webhookUrl}
+                      onChange={(e) => setWebhookUrl(e.target.value)}
+                      placeholder="https://discord.com/api/webhooks/... or https://hooks.slack.com/..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    className="btn-secondary"
+                    onClick={handleTestWebhook}
+                    disabled={testingWebhook || !webhookUrl}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', borderColor: '#5865F2', color: '#5865F2' }}
+                  >
+                    <Send size={13} />
+                    <span>{testingWebhook ? 'Dispatching...' : 'Dispatch Test Webhook'}</span>
+                  </button>
+
+                  {webhookStatus && (
+                    <span style={{ fontSize: '11px', color: webhookStatus.success ? 'var(--bull-glow)' : 'var(--bear-glow)' }}>
+                      {webhookStatus.success ? '✅ Webhook dispatched successfully!' : `❌ ${webhookStatus.error}`}
                     </span>
                   )}
                 </div>

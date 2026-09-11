@@ -7,6 +7,7 @@ const https = require('https');
 const axios = require('axios');
 const config = require('../config');
 const telegramEngine = require('./telegramEngine');
+const webhookEngine = require('./webhookEngine');
 const { calculateStandardizedSurprise } = require('../utils/eventImpactTracker');
 
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
@@ -857,6 +858,9 @@ function tick() {
       alertedEvents.add(nextEvent.id);
       console.log(`[CALENDAR] 🚨 T-5min alert for HIGH impact event: ${nextEvent.title} (${nextEvent.currency})`);
       telegramEngine.sendCalendarAlert(nextEvent);
+      webhookEngine.sendCalendarAlert(nextEvent).catch((err) =>
+        console.warn('[CALENDAR] Webhook alert notice:', err.message)
+      );
 
       if (io) {
         io.emit('calendar_alert', {

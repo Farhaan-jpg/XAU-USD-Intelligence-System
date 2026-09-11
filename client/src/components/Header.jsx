@@ -1,5 +1,5 @@
 // client/src/components/Header.jsx
-// 48px High-Density Minimalist Institutional Header with Integrated Workspace Tabs & Telemetry
+// Institutional Real-Time Executive Header Bar with Live Telemetry, Tape Speed, Killzone & Quick Modals
 
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -7,185 +7,196 @@ import {
   VolumeX,
   Settings,
   Clock,
-  Sparkles,
+  Activity,
+  Zap,
+  Radio,
+  Sliders,
+  Copy,
   Check,
-  ChevronDown,
-  LayoutDashboard,
-  Radar,
-  Newspaper,
-  Calendar,
-  Target,
-  Award,
   Bell,
   Eye,
   EyeOff,
-  Keyboard,
+  Crosshair,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
-import {
-  isMuted,
-  toggleAudioMute,
-  getVoiceSettings,
-  toggleVoiceEventChannel,
-} from '../utils/audioAlerts';
+import { isMuted, toggleAudioMute } from '../utils/audioAlerts';
 
 export default function Header({
   connected = false,
   latency = null,
-  aiTelemetry = {},
+  prices = {},
   onOpenSettings,
-  activeTab = 'TERMINAL',
-  setActiveTab = () => {},
-  newsCount = 0,
+  onOpenTelemetry,
+  onOpenSoundboard,
   onOpenAlerts,
-  onOpenShortcuts,
   focusMode = false,
   onToggleFocusMode = () => {},
   alertsCount = 0,
+  onCopySnapshot,
 }) {
   const [audioMuted, setAudioMuted] = useState(isMuted());
   const [utcTime, setUtcTime] = useState('');
-  const [showVoiceMenu, setShowVoiceMenu] = useState(false);
-  const [voiceSettings, setVoiceSettings] = useState(getVoiceSettings());
+  const [copied, setCopied] = useState(false);
 
-  const voiceMenuRef = useRef(null);
+  // Spot gold real-time flash
+  const gold = prices['GC=F'] || prices['XAUUSD'] || {};
+  const spotPrice = parseFloat(gold.price || 0);
+  const changePct = parseFloat(gold.changeDay || gold.change5m || 0);
+  const isUp = changePct >= 0;
+
+  const [tickDir, setTickDir] = useState(null);
+  const prevPriceRef = useRef(spotPrice);
+
+  useEffect(() => {
+    if (spotPrice && prevPriceRef.current && spotPrice !== prevPriceRef.current) {
+      setTickDir(spotPrice > prevPriceRef.current ? 'up' : 'down');
+      const timer = setTimeout(() => setTickDir(null), 300);
+      prevPriceRef.current = spotPrice;
+      return () => clearTimeout(timer);
+    }
+    if (spotPrice) prevPriceRef.current = spotPrice;
+  }, [spotPrice]);
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setUtcTime(
-        now.toISOString().substring(11, 19) + ' UTC'
-      );
+      setUtcTime(now.toISOString().substring(11, 19) + ' UTC');
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Close voice channels popover when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (voiceMenuRef.current && !voiceMenuRef.current.contains(e.target)) {
-        setShowVoiceMenu(false);
-      }
-    };
-    if (showVoiceMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showVoiceMenu]);
-
   const handleToggleAudio = () => {
-    const nextMuted = toggleAudioMute();
-    setAudioMuted(nextMuted);
+    const next = toggleAudioMute();
+    setAudioMuted(next);
   };
 
-  const handleChannelToggle = (channelKey) => {
-    const next = toggleVoiceEventChannel(channelKey);
-    setVoiceSettings({ ...next });
+  const handleSnapshotClick = () => {
+    if (onCopySnapshot) {
+      onCopySnapshot();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  const channels = [
-    { key: 'news', label: 'Breaking News Alerts', icon: '📢' },
-    { key: 'calendar', label: 'Economic Calendar Warnings', icon: '📅' },
-    { key: 'divergence', label: 'Macro Dollar / Yield Divergence', icon: '⚡' },
-    { key: 'liquidity', label: 'Liquidity Sweeps (BSL/SSL)', icon: '🌊' },
-    { key: 'volatility', label: 'Volatility Traps & Dumps', icon: '🔥' },
-    { key: 'sessions', label: 'Session Opens (London/NY/Asia)', icon: '🕒' },
-    { key: 'confluence', label: 'Confluence Bias Squawks', icon: '📊' },
-    { key: 'guidance', label: 'AI Market Guidance & Regimes', icon: '🧠' },
-  ];
-
-  const tabs = [
-    { id: 'TERMINAL', label: 'TERMINAL', icon: LayoutDashboard },
-    { id: 'GUIDANCE', label: 'AI GUIDANCE', icon: Sparkles },
-    { id: 'MACRO', label: 'MACRO RADAR', icon: Radar },
-    { id: 'NEWS', label: 'NEWS WIRE', icon: Newspaper, count: newsCount },
-    { id: 'LIQUIDITY', label: 'LIQUIDITY', icon: Target },
-    { id: 'COT', label: 'COT POSITIONING', icon: Award },
-    { id: 'CALENDAR', label: 'CALENDAR', icon: Calendar },
-  ];
+  const tps = typeof gold.tapeSpeed === 'number' ? gold.tapeSpeed : 1.2;
+  const tapeStatus = gold.tapeSpeedStatus || (tps >= 8.0 ? 'SURGE' : tps >= 3.0 ? 'FAST' : 'NORM');
 
   return (
     <header className="terminal-header">
-      {/* Left: Sleek Icon + Brand + v3.0 Badge */}
-      <div className="header-brand">
+      {/* Left: Brand + Gold Element + Live Spot Quick Ticker */}
+      <div className="header-brand-group">
         <div className="brand-icon">Au</div>
-        <div className="brand-title">
-          <span>XAU/USD INTELLIGENCE</span>
-          <span className="brand-badge">v3.0</span>
+        <div className="brand-text">
+          <div className="brand-title-row">
+            <span className="brand-title">XAU/USD INTELLIGENCE</span>
+            <span className="brand-badge-pro">PRO TERMINAL</span>
+          </div>
+          <span className="brand-subtitle">INSTITUTIONAL LIQUIDITY & MACRO MONITOR</span>
         </div>
+
+        {/* Real-Time Spot Quick Ticker */}
+        {spotPrice > 0 && (
+          <div className="header-spot-ticker" title="OANDA Primary Gold Spot Price">
+            <span className={`header-spot-price ${tickDir === 'up' ? 'tick-flash-up' : tickDir === 'down' ? 'tick-flash-down' : ''}`}>
+              ${spotPrice.toFixed(2)}
+            </span>
+            <span
+              className="header-spot-change"
+              style={{ color: isUp ? 'var(--bull-primary)' : 'var(--bear-primary)' }}
+            >
+              {isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              {isUp ? '+' : ''}{changePct.toFixed(2)}%
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Center: Integrated Workspace Tabs Segment Controller */}
-      <nav className="header-nav-tabs">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              className={`header-tab-btn ${isActive ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <Icon size={13} style={{ opacity: isActive ? 1 : 0.65 }} />
-              <span>{tab.label}</span>
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="tab-count-pill">{tab.count}</span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Right: Latency, UTC Clock, Ghost Action Buttons */}
-      <div className="header-right" ref={voiceMenuRef} style={{ position: 'relative' }}>
-        {/* Latency & Connection */}
-        <div className="header-telemetry-item" title={connected ? 'WebSocket Stream Connected' : 'Connecting to Terminal Hub'}>
-          <span className={`status-dot ${connected ? 'online' : ''}`} />
-          <span>{latency !== null ? `${latency}ms` : connected ? 'LIVE' : 'CONN'}</span>
+      {/* Center: Real-Time Telemetry & Status Badges */}
+      <div className="header-center-telemetry">
+        {/* Tape Velocity Pill */}
+        <div
+          className="header-pill"
+          title="Aggressive Tape Speed (Ticks Per Second)"
+          style={{
+            borderColor: tapeStatus === 'SURGE' ? 'var(--bear-primary)' : tapeStatus === 'FAST' ? 'var(--gold-primary)' : 'var(--border-subtle)',
+            color: tapeStatus === 'SURGE' ? 'var(--bear-primary)' : tapeStatus === 'FAST' ? 'var(--gold-primary)' : 'var(--text-secondary)',
+          }}
+        >
+          <Activity size={12} className={tapeStatus === 'SURGE' ? 'pulse-fast' : ''} />
+          <span>{tps.toFixed(1)} TPS &bull; {tapeStatus}</span>
         </div>
 
+        {/* Volatility Surge Alarm Flag */}
+        {gold.volatilitySurge && (
+          <div className="header-pill surge-alert" title="Rapid Volatility Expansion Detected!">
+            <Zap size={12} />
+            <span>VOL SURGE: ${parseFloat(gold.volatilitySurge.priceShift || 0).toFixed(1)}</span>
+          </div>
+        )}
+
+        {/* Session Status */}
+        {gold.session && (
+          <div className="header-pill session-pill" title="Current Market Session">
+            <Crosshair size={11} />
+            <span>{gold.session}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Right: Telemetry Modals, Snapshot, UTC, Quick Controls */}
+      <div className="header-right-controls">
+        {/* Latency & Connection Status (Click opens Telemetry Modal) */}
+        <button
+          className="header-telemetry-btn"
+          onClick={onOpenTelemetry}
+          title="Click to inspect Feed Latency, Standby Failover & Heartbeats"
+        >
+          <span className={`status-dot ${connected ? 'online' : ''}`} />
+          <span>{latency !== null ? `${latency}ms` : connected ? 'LIVE' : 'CONN'}</span>
+          <Radio size={11} style={{ opacity: 0.6 }} />
+        </button>
+
         {/* UTC Clock */}
-        <div className="header-telemetry-item" style={{ color: 'var(--text-secondary)' }}>
-          <Clock size={12} style={{ opacity: 0.6 }} />
+        <div className="header-time-pill">
+          <Clock size={11} style={{ opacity: 0.6 }} />
           <span>{utcTime}</span>
         </div>
 
-        {/* Voice Channels Menu Toggle Button */}
+        {/* Audio Squawk Soundboard Modal */}
         <button
-          className={`btn-ghost-icon ${showVoiceMenu ? 'active' : ''}`}
-          onClick={() => {
-            setVoiceSettings(getVoiceSettings());
-            setShowVoiceMenu(!showVoiceMenu);
-          }}
-          title="Voice channel configuration"
+          className="btn-ghost-icon"
+          onClick={onOpenSoundboard}
+          title="Audio Squawk Soundboard & FX Controls"
         >
-          <Volume2 size={15} style={{ color: audioMuted ? 'var(--text-dim)' : 'var(--cyan-primary)' }} />
+          <Sliders size={14} style={{ color: 'var(--gold-primary)' }} />
         </button>
 
-        {/* Master Audio Mute Button */}
+        {/* One-Click Executive Market Snapshot */}
         <button
-          className={`btn-ghost-icon ${audioMuted ? 'active' : ''}`}
-          onClick={handleToggleAudio}
-          title={audioMuted ? 'Unmute voice and audio alerts (M)' : 'Mute all audio alerts (M)'}
+          className={`btn-ghost-icon ${copied ? 'copied' : ''}`}
+          onClick={handleSnapshotClick}
+          title="Copy Executive Intelligence Snapshot to Clipboard"
         >
-          {audioMuted ? <VolumeX size={15} style={{ color: 'var(--bear-primary)' }} /> : <Volume2 size={15} />}
+          {copied ? <Check size={14} style={{ color: 'var(--bull-primary)' }} /> : <Copy size={14} />}
         </button>
 
-        {/* Custom Price Alerts Button */}
+        {/* Price Alerts Modal */}
         <button
           className="btn-ghost-icon"
           onClick={onOpenAlerts}
           title="Custom Price Level Alerts (P)"
           style={{ position: 'relative' }}
         >
-          <Bell size={15} style={{ color: alertsCount > 0 ? 'var(--gold-primary)' : undefined }} />
+          <Bell size={14} style={{ color: alertsCount > 0 ? 'var(--gold-primary)' : undefined }} />
           {alertsCount > 0 && (
             <span
               style={{
                 position: 'absolute',
-                top: '2px',
-                right: '2px',
+                top: '4px',
+                right: '4px',
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
@@ -195,118 +206,32 @@ export default function Header({
           )}
         </button>
 
-        {/* Focus Mode / Dark Dimmer Button */}
+        {/* Master Audio Mute Toggle */}
+        <button
+          className={`btn-ghost-icon ${audioMuted ? 'active' : ''}`}
+          onClick={handleToggleAudio}
+          title={audioMuted ? 'Unmute voice and audio squawks' : 'Mute all audio squawks'}
+        >
+          {audioMuted ? <VolumeX size={14} style={{ color: 'var(--bear-primary)' }} /> : <Volume2 size={14} />}
+        </button>
+
+        {/* Bloomberg Dark Focus Mode */}
         <button
           className={`btn-ghost-icon ${focusMode ? 'active' : ''}`}
           onClick={onToggleFocusMode}
-          title={focusMode ? 'Exit Focus Mode (F)' : 'Enter Bloomberg Focus Mode (F)'}
-          style={focusMode ? { background: 'rgba(56, 189, 248, 0.15)', color: 'var(--cyan-primary)' } : {}}
+          title={focusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'}
         >
-          {focusMode ? <EyeOff size={15} style={{ color: 'var(--cyan-primary)' }} /> : <Eye size={15} />}
+          {focusMode ? <EyeOff size={14} style={{ color: 'var(--cyan-primary)' }} /> : <Eye size={14} />}
         </button>
 
-        {/* Keyboard Shortcuts Button */}
-        <button
-          className="btn-ghost-icon"
-          onClick={onOpenShortcuts}
-          title="Keyboard Shortcuts Cheatsheet (?)"
-        >
-          <Keyboard size={15} />
-        </button>
-
-        {/* Global Settings */}
+        {/* Global Settings Modal */}
         <button
           className="btn-ghost-icon"
           onClick={onOpenSettings}
-          title="Terminal Settings & AI Configuration (S)"
+          title="Settings, Webhooks & AI Key Configuration"
         >
-          <Settings size={15} />
+          <Settings size={14} />
         </button>
-
-        {/* Voice Channels Popover */}
-        {showVoiceMenu && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '42px',
-              right: '0',
-              width: '280px',
-              background: '#111620',
-              border: '1px solid var(--border-medium)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.65)',
-              zIndex: 200,
-              padding: '10px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingBottom: '6px',
-                borderBottom: '1px solid var(--border-subtle)',
-              }}
-            >
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Voice Channels
-              </span>
-              <span style={{ fontSize: '10px', color: audioMuted ? 'var(--bear-primary)' : 'var(--bull-primary)', fontWeight: 600 }}>
-                {audioMuted ? 'MUTED' : 'ACTIVE'}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '280px', overflowY: 'auto' }}>
-              {channels.map((ch) => {
-                const isEnabled = voiceSettings.enabledEvents?.[ch.key] !== false;
-                return (
-                  <button
-                    key={ch.key}
-                    onClick={() => handleChannelToggle(ch.key)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '5px 8px',
-                      borderRadius: '4px',
-                      background: isEnabled ? 'rgba(56, 189, 248, 0.05)' : 'transparent',
-                      border: '1px solid',
-                      borderColor: isEnabled ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                      color: isEnabled ? 'var(--text-main)' : 'var(--text-dim)',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      textAlign: 'left',
-                      transition: 'all 0.1s ease',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '11px' }}>{ch.icon}</span>
-                      <span>{ch.label}</span>
-                    </div>
-                    <div
-                      style={{
-                        width: '14px',
-                        height: '14px',
-                        borderRadius: '3px',
-                        border: '1px solid',
-                        borderColor: isEnabled ? 'var(--cyan-primary)' : 'var(--border-subtle)',
-                        background: isEnabled ? 'var(--cyan-primary)' : 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {isEnabled && <Check size={10} style={{ color: '#0B0E14', strokeWidth: 3 }} />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
     </header>
   );

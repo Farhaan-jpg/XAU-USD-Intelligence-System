@@ -7,7 +7,9 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const shortcuts = [
-    { key: '1 - 7', desc: 'Direct Workspace Navigation (Terminal, Guidance, Macro, News, Liquidity, COT, Calendar)' },
+    { key: 'C', desc: 'Copy Executive Market Intelligence Snapshot to Clipboard' },
+    { key: 'T', desc: 'Open Feed Latency & Pipeline Telemetry Inspector' },
+    { key: 'B', desc: 'Open Institutional Audio Squawk Soundboard' },
     { key: 'M', desc: 'Toggle Audio Squawk Mute / Unmute' },
     { key: 'G', desc: 'Trigger Instant AI Market Guidance Refresh' },
     { key: 'P', desc: 'Open Real-Time Custom Price Alerts Manager' },

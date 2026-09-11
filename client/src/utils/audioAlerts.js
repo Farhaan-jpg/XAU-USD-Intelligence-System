@@ -327,6 +327,40 @@ export function playSessionAlert() {
   } catch (_) {}
 }
 
+/**
+ * Universal Chime Dispatcher
+ */
+export function playChime(type = 'flash') {
+  switch (type) {
+    case 'event':
+      playEventWarning();
+      break;
+    case 'confluence':
+      playConfluenceAlert();
+      break;
+    case 'divergence':
+      playDivergenceAlert();
+      break;
+    case 'liquidity':
+      playLiquiditySweepAlert();
+      break;
+    case 'trap':
+      playTrapAlert();
+      break;
+    case 'bearish':
+      playBearishAlert();
+      break;
+    case 'session':
+      playSessionAlert();
+      break;
+    case 'flash':
+    case 'chime':
+    default:
+      playFlashAlert();
+      break;
+  }
+}
+
 // -------------------------------------------------------------
 // Voice Detection & Indian Female Voice Prioritization
 // -------------------------------------------------------------

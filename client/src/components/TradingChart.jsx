@@ -2,10 +2,16 @@
 // Professional High-Density TradingView Workstation with Compact Single-Row Price & Pivot Ticker
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, BarChart2, Activity, Layers } from 'lucide-react';
+import TickTape from './TickTape';
+import MTFMatrix from './MTFMatrix';
+import VolumeProfileOverlay from './VolumeProfileOverlay';
 
 export default function TradingChart({ prices = {} }) {
   const [interval, setInterval] = useState('5'); // '1', '5', '15', '60', '240', 'D'
+  const [showTape, setShowTape] = useState(true);
+  const [showMTF, setShowMTF] = useState(true);
+  const [showVP, setShowVP] = useState(true);
 
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
@@ -176,6 +182,37 @@ export default function TradingChart({ prices = {} }) {
 
         {/* Right: Minimalist Timeframe Segmented Control & TV Link */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Overlay Toggles */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
+            <button
+              className={`timeframe-btn ${showTape ? 'active' : ''}`}
+              onClick={() => setShowTape(!showTape)}
+              title="Toggle Live Tick Tape & Velocity"
+              style={{ fontSize: '10px', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}
+            >
+              <Activity size={10} />
+              <span>TAPE</span>
+            </button>
+            <button
+              className={`timeframe-btn ${showMTF ? 'active' : ''}`}
+              onClick={() => setShowMTF(!showMTF)}
+              title="Toggle Multi-Timeframe Alignment Ribbon"
+              style={{ fontSize: '10px', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}
+            >
+              <Layers size={10} />
+              <span>MTF</span>
+            </button>
+            <button
+              className={`timeframe-btn ${showVP ? 'active' : ''}`}
+              onClick={() => setShowVP(!showVP)}
+              title="Toggle Intraday Volume Profile (POC/VAH/VAL)"
+              style={{ fontSize: '10px', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}
+            >
+              <BarChart2 size={10} />
+              <span>VPVR</span>
+            </button>
+          </div>
+
           <div className="timeframe-segment-control">
             {intervals.map((tf) => (
               <button
@@ -201,6 +238,12 @@ export default function TradingChart({ prices = {} }) {
         </div>
       </div>
 
+      {/* Sub-Second Micro-Tick Tape Bar */}
+      {showTape && <TickTape prices={prices} />}
+
+      {/* Multi-Timeframe Trend & Alignment Ribbon */}
+      {showMTF && <MTFMatrix prices={prices} />}
+
       {/* TradingView Interactive Chart Container */}
       <div className="interactive-chart-box">
         <iframe
@@ -212,6 +255,9 @@ export default function TradingChart({ prices = {} }) {
           scrolling="no"
         />
       </div>
+
+      {/* Intraday Volume Profile Overlay */}
+      {showVP && <VolumeProfileOverlay prices={prices} />}
     </div>
   );
 }

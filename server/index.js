@@ -15,6 +15,7 @@ const newsEngine = require('./engines/newsEngine');
 const calendarEngine = require('./engines/calendarEngine');
 const cotEngine = require('./engines/cotEngine');
 const telegramEngine = require('./engines/telegramEngine');
+const webhookEngine = require('./engines/webhookEngine');
 const aiOrchestrator = require('./utils/aiOrchestrator');
 const settingsStore = require('./utils/settingsStore');
 const newsArchive = require('./utils/newsArchive');
@@ -259,6 +260,7 @@ app.get('/api/settings', (req, res) => {
       maskedToken: maskKey(config.telegram.token),
       chatId: config.telegram.chatId || '',
     },
+    webhook: webhookEngine.getConfig(),
     telemetry,
     intervals: config.intervals,
     feeds: config.rssFeeds.map((f) => ({ name: f.name, url: f.url })),
@@ -267,7 +269,7 @@ app.get('/api/settings', (req, res) => {
 
 app.post('/api/settings', (req, res) => {
   try {
-    const { googleKey, googleModel, openrouterKey, model, fallbackModel, telegramToken, telegramChatId, intervals } = req.body;
+    const { googleKey, googleModel, openrouterKey, model, fallbackModel, telegramToken, telegramChatId, intervals, webhookUrl, webhookType, webhookEnabled } = req.body;
 
     if (googleKey || googleModel) {
       aiOrchestrator.updateGeminiConfig({
@@ -291,13 +293,21 @@ app.post('/api/settings', (req, res) => {
       );
     }
 
+    if (webhookUrl !== undefined || webhookType !== undefined || webhookEnabled !== undefined) {
+      webhookEngine.updateConfig(
+        webhookUrl !== undefined ? webhookUrl : webhookEngine.getConfig().url,
+        webhookType || webhookEngine.getConfig().type,
+        webhookEnabled !== undefined ? webhookEnabled : webhookEngine.getConfig().enabled
+      );
+    }
+
     if (intervals) {
       if (intervals.price) config.intervals.price = parseInt(intervals.price, 10);
       if (intervals.news) config.intervals.news = parseInt(intervals.news, 10);
       if (intervals.calendar) config.intervals.calendar = parseInt(intervals.calendar, 10);
     }
 
-    // Persist settings to disk so they survive Render redeployments / container restarts
+    // Persist settings to disk so they survive container restarts
     try {
       settingsStore.saveSettings({
         googleKey: googleKey || config.google.apiKey,
@@ -307,6 +317,9 @@ app.post('/api/settings', (req, res) => {
         fallbackModel: fallbackModel || config.openrouter.fallbackModel,
         telegramToken: telegramToken || config.telegram.token,
         telegramChatId: telegramChatId || config.telegram.chatId,
+        webhookUrl: webhookUrl !== undefined ? webhookUrl : webhookEngine.getConfig().url,
+        webhookType: webhookType || webhookEngine.getConfig().type,
+        webhookEnabled: webhookEnabled !== undefined ? webhookEnabled : webhookEngine.getConfig().enabled,
         intervals: config.intervals,
       });
     } catch (_) {}
@@ -314,6 +327,18 @@ app.post('/api/settings', (req, res) => {
     res.json({ success: true, message: 'Settings updated and persisted successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Test Webhook notification route (Discord, Slack, Custom)
+app.post('/api/settings/test-webhook', async (req, res) => {
+  try {
+    const { url, type } = req.body || {};
+    const result = await webhookEngine.sendTestMessage(url, type);
+    res.json(result);
+  } catch (err) {
+    console.error('[SETTINGS] Webhook test failed:', err.message);
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
@@ -415,6 +440,9 @@ async function bootstrap() {
       if (persisted.fallbackModel) config.openrouter.fallbackModel = persisted.fallbackModel;
       if (persisted.telegramToken) config.telegram.token = persisted.telegramToken;
       if (persisted.telegramChatId) config.telegram.chatId = persisted.telegramChatId;
+      if (persisted.webhookUrl || persisted.webhookType) {
+        webhookEngine.updateConfig(persisted.webhookUrl, persisted.webhookType, persisted.webhookEnabled);
+      }
       if (persisted.intervals) config.intervals = { ...config.intervals, ...persisted.intervals };
       console.log('[BOOTSTRAP] 💾 Loaded persistent settings from disk');
     }
