@@ -58,6 +58,28 @@ export function useSocket() {
     };
     fetchLatestPrices();
 
+    // Initial fetch for News & Calendar to ensure zero startup delay
+    const fetchNewsAndCalendar = () => {
+      fetch('/api/news')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setNewsFeed((prev) => (prev.length === 0 ? data : prev));
+          }
+        })
+        .catch(() => {});
+
+      fetch('/api/calendar')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            setCalendarData((prev) => (prev ? prev : data));
+          }
+        })
+        .catch(() => {});
+    };
+    fetchNewsAndCalendar();
+
     // Initial fetch for COT & Retail sentiment
     fetch('/api/cot')
       .then((res) => (res.ok ? res.json() : null))
@@ -67,7 +89,10 @@ export function useSocket() {
       .catch(() => {});
 
     // Backup polling: start immediately for cold-start, stops once WebSocket is live
-    backupPollRef.current = setInterval(fetchLatestPrices, 2500);
+    backupPollRef.current = setInterval(() => {
+      fetchLatestPrices();
+      fetchNewsAndCalendar();
+    }, 2500);
 
     const onConnect = () => {
       setConnected(true);
@@ -85,7 +110,10 @@ export function useSocket() {
       if (pingTimerRef.current) clearInterval(pingTimerRef.current);
       // Resume backup polling when WebSocket drops
       if (!backupPollRef.current) {
-        backupPollRef.current = setInterval(fetchLatestPrices, 2500);
+        backupPollRef.current = setInterval(() => {
+          fetchLatestPrices();
+          fetchNewsAndCalendar();
+        }, 2500);
       }
     };
 

@@ -374,6 +374,11 @@ io.on('connection', (socket) => {
   const latestNews = newsEngine.getLatest();
   if (latestNews.length > 0) {
     socket.emit('news_batch', latestNews.slice(0, 35));
+  } else {
+    const archived = newsArchive.getArchivedNews({ limit: 35 });
+    if (archived && archived.length > 0) {
+      socket.emit('news_batch', archived);
+    }
   }
 
   const calendarData = calendarEngine.getData();

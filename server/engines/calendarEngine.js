@@ -807,9 +807,10 @@ function generateProjectedEvents(baseDate) {
 function tick() {
   const now = new Date();
 
-  // Filter future & recent events
+  // Prune completed events: only keep active/upcoming events (prune anything older than 60 seconds)
+  const cutoffTime = new Date(now.getTime() - 60 * 1000);
   let sorted = [...activeCalendar]
-    .filter((e) => new Date(e.date) >= new Date(now.getTime() - 2 * 3600 * 1000))
+    .filter((e) => new Date(e.date) >= cutoffTime)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   // If fewer than 10 future events remain, inject rolling projected events

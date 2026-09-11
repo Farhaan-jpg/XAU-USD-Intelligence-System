@@ -17,8 +17,13 @@ export default function EconomicCalendar({ calendarData = {} }) {
   }, []);
 
   const allEvents = useMemo(() => {
-    return calendarData?.events || calendarData?.upcomingEvents || [];
-  }, [calendarData]);
+    const raw = calendarData?.events || calendarData?.upcomingEvents || [];
+    // Automatically prune completed news events (remove once event time has passed by > 60s)
+    return raw.filter((e) => {
+      const eventTime = new Date(e.date || e.timeUTC).getTime();
+      return eventTime >= (now - 60000);
+    });
+  }, [calendarData, now]);
 
   const filteredEvents = useMemo(() => {
     return allEvents.filter((e) => {
@@ -153,8 +158,8 @@ export default function EconomicCalendar({ calendarData = {} }) {
                 const eventTimeMs = new Date(e.date || e.timeUTC).getTime();
                 const diffMs = eventTimeMs - now;
 
-                let countdownLabel = 'COMPLETED';
-                let countdownColor = 'var(--text-dim)';
+                let countdownLabel = 'RELEASED';
+                let countdownColor = 'var(--cyan-primary)';
 
                 if (diffMs > 0) {
                   const sec = Math.floor(diffMs / 1000);
@@ -224,8 +229,8 @@ export default function EconomicCalendar({ calendarData = {} }) {
           fontFamily: 'var(--font-mono)',
         }}
       >
-        <span>FOREX FACTORY FEED</span>
-        <span>{filteredEvents.length} SCHEDULED</span>
+        <span>FOREX FACTORY &bull; COMPLETED PRUNED</span>
+        <span>{filteredEvents.length} UPCOMING</span>
       </div>
     </div>
   );

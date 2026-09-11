@@ -249,16 +249,25 @@ class BinancePAXGStreamer {
     this.ws = null;
     this.reconnectTimer = null;
     this.isClosed = false;
+    this.endpointIndex = 0;
+    this.endpoints = [
+      'wss://data-stream.binance.vision:9443/ws/paxgusdt@ticker',
+      'wss://stream.binance.com:9443/ws/paxgusdt@ticker',
+    ];
+    this.hasLogged451 = false;
     this.connect();
   }
 
   connect() {
     if (this.isClosed) return;
+    const url = this.endpoints[this.endpointIndex % this.endpoints.length];
+
     try {
-      this.ws = new WebSocket('wss://stream.binance.com:9443/ws/paxgusdt@ticker');
+      this.ws = new WebSocket(url);
 
       this.ws.on('open', () => {
-        console.log('[BINANCE-PAXG] Connected to 24/7 sub-10ms Pax Gold WebSocket stream');
+        console.log(`[BINANCE-PAXG] Connected to 24/7 Pax Gold WebSocket stream (${url.includes('vision') ? 'Binance Vision' : 'Binance Core'})`);
+        this.hasLogged451 = false;
       });
 
       this.ws.on('message', (data) => {
@@ -272,15 +281,27 @@ class BinancePAXGStreamer {
 
       this.ws.on('close', () => {
         if (!this.isClosed) {
-          this.reconnectTimer = setTimeout(() => this.connect(), 2000);
+          // If geo-restricted, back off for 15 minutes to prevent log storm
+          const delay = this.hasLogged451 ? 15 * 60 * 1000 : 5000;
+          this.reconnectTimer = setTimeout(() => {
+            this.endpointIndex++;
+            this.connect();
+          }, delay);
         }
       });
 
       this.ws.on('error', (err) => {
-        console.warn('[BINANCE-PAXG] WebSocket notice:', err.message);
+        if (err.message && err.message.includes('451')) {
+          if (!this.hasLogged451) {
+            this.hasLogged451 = true;
+            console.log('[BINANCE-PAXG] Notice: Host datacenter IP is geo-restricted by Binance (HTTP 451). Standby stream paused; primary OANDA:XAUUSD quote stream is fully active.');
+          }
+        } else {
+          console.warn('[BINANCE-PAXG] WebSocket notice:', err.message);
+        }
       });
     } catch (err) {
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      this.reconnectTimer = setTimeout(() => this.connect(), 10000);
     }
   }
 
