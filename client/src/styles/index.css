@@ -5,7 +5,7 @@
    OLED-black → deep navy cards → precision data typography
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
 
 /* ─── TOKENS ────────────────────────────────────────────────────────────── */
 :root {
@@ -1169,3 +1169,324 @@ input, select, textarea { font-family: var(--font-sans); }
   .hdr-brand-sub { display: none; }
   .spot-price-big { font-size: 22px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CONCEPTUAL MINIMAL TERMINAL  ·  XAU/USD INTELLIGENCE
+   Maximum negative space, single-column prioritized stacking, OLED-dark theme
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.minimal-terminal-shell {
+  min-height: 100dvh;
+  background: #08090D;
+  color: var(--t1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 64px;
+}
+
+.minimal-terminal-container {
+  width: 100%;
+  max-width: 880px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Minimal Header ── */
+.min-header-card {
+  background: #10111A;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.min-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.min-header-symbol {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+}
+
+.min-header-price {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.02em;
+}
+
+.min-header-change {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.min-header-change.bull {
+  color: var(--bull);
+  background: rgba(0, 217, 126, 0.10);
+  border: 1px solid rgba(0, 217, 126, 0.20);
+}
+.min-header-change.bear {
+  color: var(--bear);
+  background: rgba(255, 59, 92, 0.10);
+  border: 1px solid rgba(255, 59, 92, 0.20);
+}
+
+.min-header-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--t2);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.min-session-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bull);
+  box-shadow: 0 0 8px var(--bull);
+  animation: pulse-dot 2s infinite;
+}
+
+/* ── Minimal Chart Card ── */
+.min-chart-card {
+  background: #10111A;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  overflow: hidden;
+  height: 480px;
+  position: relative;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.min-chart-card iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* ── Minimal Actionable Bias Card ── */
+.min-bias-card {
+  background: #10111A;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.min-card-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: var(--t3);
+  text-transform: uppercase;
+  align-self: flex-start;
+}
+
+.min-gauge-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.min-gauge-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.min-gauge-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-width: 8;
+}
+
+.min-gauge-bar {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.min-gauge-center {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.min-gauge-score {
+  font-family: var(--font-mono);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.min-gauge-bias-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--t3);
+  margin-top: 4px;
+}
+
+/* Top 2 Liquidity Flow Bars */
+.min-flows-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.min-flow-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.min-flow-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.min-flow-title {
+  color: var(--t2);
+  font-weight: 500;
+}
+
+.min-flow-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.min-flow-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.min-flow-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Minimal Guidance Card ── */
+.min-guidance-card {
+  background: #10111A;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.min-guidance-text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--t1);
+  font-weight: 400;
+}
+
+/* ── Minimal Critical Event Card ── */
+.min-event-card {
+  background: #10111A;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 20px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.min-event-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.min-event-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.min-event-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.min-event-countdown {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold);
+  background: rgba(201, 168, 78, 0.08);
+  border: 1px solid rgba(201, 168, 78, 0.25);
+  padding: 6px 16px;
+  border-radius: 8px;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 600px) {
+  .min-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .min-header-price {
+    font-size: 24px;
+  }
+  .min-chart-card {
+    height: 380px;
+  }
+  .min-event-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .min-event-countdown {
+    align-self: flex-start;
+  }
+}
+
