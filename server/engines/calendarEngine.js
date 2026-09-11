@@ -2,9 +2,16 @@
 // Production Economic Calendar Engine — Forex Factory Synchronized
 // Real-time tracking of Tier-1 macro events with countdowns, actual releases, and T-5min alerts
 
+const http = require('http');
+const https = require('https');
 const axios = require('axios');
 const config = require('../config');
 const telegramEngine = require('./telegramEngine');
+const { calculateStandardizedSurprise } = require('../utils/eventImpactTracker');
+
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
+const fastAxios = axios.create({ httpAgent, httpsAgent, timeout: 5000 });
 
 let io = null;
 let pollTimer = null;
@@ -720,7 +727,7 @@ function init(socketIo) {
  */
 async function syncLiveForexFactory() {
   try {
-    const res = await axios.get('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
+    const res = await fastAxios.get('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
       timeout: 6000,
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
     });
@@ -737,13 +744,15 @@ async function syncLiveForexFactory() {
           if (match.forecast) event.forecast = match.forecast;
           if (match.previous) event.previous = match.previous;
           if (match.actual) event.actual = match.actual;
+          if (event.actual && event.forecast) {
+            event.surprise = calculateStandardizedSurprise(event.title, event.currency, event.actual, event.forecast);
+          }
         }
       });
       console.log(`[CALENDAR] ✅ Synced live actuals with Forex Factory feed (${liveItems.length} items)`);
     }
   } catch (err) {
     // Graceful fallback to verified PDF schedule if rate-limited
-    // console.warn('[CALENDAR] Live FF feed skipped (using verified schedule):', err.message);
   }
 }
 
@@ -817,6 +826,13 @@ function tick() {
     sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
   }
 
+  // Enrich events with standardized surprise index if actual and forecast are present
+  sorted.forEach((e) => {
+    if (e.actual && e.forecast && !e.surprise) {
+      e.surprise = calculateStandardizedSurprise(e.title, e.currency, e.actual, e.forecast);
+    }
+  });
+
   // Find next upcoming event
   const upcoming = sorted.filter((e) => new Date(e.date) > now);
   const nextEvent = upcoming[0] || null;
@@ -865,8 +881,8 @@ function tick() {
     io.emit('calendar_update', payload);
   }
 
-  return payload;
-}
+    return payload;
+  }
 
 function start() {
   if (isRunning) return;

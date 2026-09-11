@@ -3,15 +3,123 @@
 // Connects directly to TradingView's live quote WebSocket for OANDA:XAUUSD & TVC:SILVER
 // with seamless multi-tier HTTP fallback (GoldAPI, Binance PAXG, Yahoo Finance)
 
+const http = require('http');
+const https = require('https');
 const WebSocket = require('ws');
 const axios = require('axios');
 const YahooFinanceClass = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
 const config = require('../config');
 
+// Persistent HTTP/HTTPS agents to eliminate TCP/TLS connection handshake delays
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
+const fastAxios = axios.create({ httpAgent, httpsAgent, timeout: 2500 });
+
 // Time-sampled rolling price buffer — records snapshots every 2s for up to 4 hours (up to 7,200 points)
 const priceHistory = {};
 const MAX_HISTORY_MS = 4 * 60 * 60 * 1000;
+
+// Institutional Session VWAP & Cumulative Volume Delta (CVD) trackers
+let sessionDateKey = '';
+let sessionCumVol = 0;
+let sessionCumPV = 0;
+let sessionCumDelta = 0;
+let sessionVWAP = 0;
+let sessionVWAPDev = 2.5;
+
+function updateSessionVWAP(price, volume, isBuy = true) {
+  if (!price || price <= 0) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (sessionDateKey !== today) {
+    sessionDateKey = today;
+    sessionCumVol = 0;
+    sessionCumPV = 0;
+    sessionCumDelta = 0;
+    sessionVWAP = price;
+  }
+
+  const effectiveVol = Math.max(1, volume || 1);
+  sessionCumVol += effectiveVol;
+  sessionCumPV += price * effectiveVol;
+  sessionCumDelta += isBuy ? effectiveVol : -effectiveVol;
+  sessionVWAP = parseFloat((sessionCumPV / sessionCumVol).toFixed(2));
+
+  // Rolling deviation
+  const diff = Math.abs(price - sessionVWAP);
+  sessionVWAPDev = Math.max(1.8, parseFloat((diff * 0.85 + (sessionVWAPDev || 2) * 0.15).toFixed(2)));
+}
+
+/**
+ * Smart Money Technique (SMT) Divergence Detector: Gold vs Silver
+ * Checks rolling 20-minute swing highs and lows
+ * Bullish SMT: Gold makes Lower Low while Silver holds Higher Low (Institutional Absorption)
+ * Bearish SMT: Gold makes Higher High while Silver fails with Lower High (Institutional Distribution)
+ */
+function computeSMTDivergence() {
+  const goldHist = priceHistory['GC=F'];
+  const silverHist = priceHistory['SI=F'];
+  if (!goldHist || !silverHist || goldHist.length < 15 || silverHist.length < 15) {
+    return { status: 'NEUTRAL', type: 'ALIGNED', detail: 'Accumulating price structure for SMT detection', timestamp: new Date().toISOString() };
+  }
+
+  const now = Date.now();
+  const windowMs = 25 * 60 * 1000; // 25 mins
+  const halfWindow = 12.5 * 60 * 1000;
+
+  const gRecent = goldHist.filter((p) => now - p.ts <= windowMs);
+  const sRecent = silverHist.filter((p) => now - p.ts <= windowMs);
+  if (gRecent.length < 8 || sRecent.length < 8) {
+    return { status: 'NEUTRAL', type: 'ALIGNED', detail: 'Accumulating swing structure', timestamp: new Date().toISOString() };
+  }
+
+  const midTs = now - halfWindow;
+  const gP1 = gRecent.filter((p) => p.ts < midTs);
+  const gP2 = gRecent.filter((p) => p.ts >= midTs);
+  const sP1 = sRecent.filter((p) => p.ts < midTs);
+  const sP2 = sRecent.filter((p) => p.ts >= midTs);
+
+  if (gP1.length === 0 || gP2.length === 0 || sP1.length === 0 || sP2.length === 0) {
+    return { status: 'NEUTRAL', type: 'ALIGNED', detail: 'Syncing phase data', timestamp: new Date().toISOString() };
+  }
+
+  const gHigh1 = Math.max(...gP1.map((p) => p.price));
+  const gHigh2 = Math.max(...gP2.map((p) => p.price));
+  const gLow1 = Math.min(...gP1.map((p) => p.price));
+  const gLow2 = Math.min(...gP2.map((p) => p.price));
+
+  const sHigh1 = Math.max(...sP1.map((p) => p.price));
+  const sHigh2 = Math.max(...sP2.map((p) => p.price));
+  const sLow1 = Math.min(...sP1.map((p) => p.price));
+  const sLow2 = Math.min(...sP2.map((p) => p.price));
+
+  // Bearish SMT: Gold printed Higher High while Silver failed and made Lower High
+  if (gHigh2 > gHigh1 + 0.35 && sHigh2 < sHigh1 - 0.04) {
+    return {
+      status: 'BEARISH_SMT',
+      type: 'DISTRIBUTION',
+      detail: `Bearish SMT Divergence: Gold printed Higher High ($${gHigh2.toFixed(2)}) while Silver failed with Lower High ($${sHigh2.toFixed(2)}). Smart money institutional distribution detected.`,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // Bullish SMT: Gold swept Lower Low while Silver held Higher Low
+  if (gLow2 < gLow1 - 0.35 && sLow2 > sLow1 + 0.04) {
+    return {
+      status: 'BULLISH_SMT',
+      type: 'ACCUMULATION',
+      detail: `Bullish SMT Divergence: Gold swept Lower Low ($${gLow2.toFixed(2)}) while Silver held Higher Low ($${sLow2.toFixed(2)}). Institutional absorption and bear trap detected.`,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  return {
+    status: 'NEUTRAL',
+    type: 'ALIGNED',
+    detail: 'Precious metals complex trend aligned between Gold and Silver.',
+    timestamp: new Date().toISOString(),
+  };
+}
 
 function recordPriceSample(sym, price) {
   if (!price || isNaN(price)) return;
@@ -84,7 +192,11 @@ let pollTimer = null;
 let latestPrices = {};
 let isRunning = false;
 let tvStreamer = null;
+let binanceStreamer = null;
 let lastWsTickTime = 0;
+let lastOandaTickTime = 0;
+let lastPaxgTickTime = 0;
+let latestPaxgPrice = 0;
 let broadcastThrottleTimer = null;
 let lastBroadcastTime = 0;
 const BROADCAST_THROTTLE_MS = 50; // up to 20 fps - sub-second real-time delivery with zero artificial lag
@@ -124,6 +236,138 @@ function scheduleBroadcast() {
         });
       }
     }, BROADCAST_THROTTLE_MS - elapsed);
+  }
+}
+
+/**
+ * Real-Time Binance PAXG (Pax Gold) 24/7 Sub-10ms WebSocket Streamer
+ * Runs as a hot-standby and microsecond momentum lead detector.
+ * IMPORTANT: OANDA:XAUUSD remains the primary authoritative trading anchor whenever active.
+ */
+class BinancePAXGStreamer {
+  constructor() {
+    this.ws = null;
+    this.reconnectTimer = null;
+    this.isClosed = false;
+    this.connect();
+  }
+
+  connect() {
+    if (this.isClosed) return;
+    try {
+      this.ws = new WebSocket('wss://stream.binance.com:9443/ws/paxgusdt@ticker');
+
+      this.ws.on('open', () => {
+        console.log('[BINANCE-PAXG] Connected to 24/7 sub-10ms Pax Gold WebSocket stream');
+      });
+
+      this.ws.on('message', (data) => {
+        try {
+          const tick = JSON.parse(data.toString());
+          if (tick && tick.c) {
+            this.handleTick(tick);
+          }
+        } catch (_) {}
+      });
+
+      this.ws.on('close', () => {
+        if (!this.isClosed) {
+          this.reconnectTimer = setTimeout(() => this.connect(), 2000);
+        }
+      });
+
+      this.ws.on('error', (err) => {
+        console.warn('[BINANCE-PAXG] WebSocket notice:', err.message);
+      });
+    } catch (err) {
+      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+    }
+  }
+
+  handleTick(tick) {
+    const price = parseFloat(parseFloat(tick.c).toFixed(2));
+    if (!price || isNaN(price)) return;
+    lastPaxgTickTime = Date.now();
+    latestPaxgPrice = price;
+
+    const bid = tick.b ? parseFloat(parseFloat(tick.b).toFixed(2)) : price;
+    const ask = tick.a ? parseFloat(parseFloat(tick.a).toFixed(2)) : price;
+    const high = tick.h ? parseFloat(parseFloat(tick.h).toFixed(2)) : price;
+    const low = tick.l ? parseFloat(parseFloat(tick.l).toFixed(2)) : price;
+    const chp = tick.P ? parseFloat(parseFloat(tick.P).toFixed(2)) : 0;
+
+    // Track dedicated PAXG 24/7 stream
+    latestPrices['PAXGUSDT'] = {
+      symbol: 'PAXGUSDT',
+      label: 'PAXG/USDT',
+      description: 'Physical Gold 1:1 Token (Binance 24/7)',
+      unit: 'USD/oz',
+      price,
+      bid,
+      ask,
+      high,
+      low,
+      changeDay: chp,
+      updatedAt: new Date().toISOString(),
+      latency: 'SUB_10MS_STREAM',
+      source: 'BINANCE_PAXG_STREAM',
+    };
+
+    // Check if OANDA is currently active
+    const isOandaActive = (Date.now() - lastOandaTickTime) < 4500;
+
+    // ONLY IF OANDA:XAUUSD is silent / disconnected (e.g. weekend or network drop),
+    // Binance PAXG acts as zero-delay hot standby to maintain uninterrupted feed
+    if (!isOandaActive) {
+      recordPriceSample('GC=F', price);
+      const change5mEntry = getChangeSince('GC=F', 5 * 60 * 1000, price, high, low);
+      const change5m = change5mEntry.chp;
+
+      const goldData = {
+        symbol: 'GC=F',
+        label: 'XAU/USD',
+        description: 'Gold Spot (Binance PAXG 24/7 Standby)',
+        unit: 'USD/oz',
+        correlation: 'primary',
+        price,
+        change5m: parseFloat(change5m.toFixed(4)),
+        changeDay: chp,
+        bid,
+        ask,
+        high,
+        low,
+        open: price,
+        priceLocation: 0.5,
+        pivotP: price,
+        volume: parseFloat(tick.v || 0),
+        direction: change5m > 0.0005 ? 'UP' : change5m < -0.0005 ? 'DOWN' : 'FLAT',
+        updatedAt: new Date().toISOString(),
+        latency: 'SUB_10MS_STANDBY',
+        source: 'BINANCE_PAXG_STANDBY',
+        isHotStandby: true,
+        authoritativeSource: 'OANDA:XAUUSD (Standby Mode)',
+        intervals: {
+          '1': { ch: 0, chp: 0 },
+          '5': { ch: parseFloat(((price * change5m) / 100).toFixed(2)), chp: parseFloat(change5m.toFixed(2)) },
+          '15': { ch: 0, chp: 0 },
+          '60': { ch: 0, chp: 0 },
+          '240': { ch: 0, chp: 0 },
+          'D': { ch: 0, chp },
+        },
+      };
+
+      latestPrices['GC=F'] = goldData;
+      latestPrices['XAUUSD'] = goldData;
+      scheduleBroadcast();
+    }
+  }
+
+  stop() {
+    this.isClosed = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.ws) {
+      try { this.ws.close(); } catch (_) {}
+    }
   }
 }
 
@@ -218,6 +462,7 @@ class TVStreamer {
     const isSilver = sym.includes('SILVER') || sym.includes('XAGUSD');
 
     if (isGold) {
+      lastOandaTickTime = Date.now();
       const existing = latestPrices['GC=F'] || {};
       const newPrice = v.lp ? parseFloat(v.lp.toFixed(2)) : (v.bid && v.ask ? parseFloat(((v.bid + v.ask) / 2).toFixed(2)) : (v.bid ? parseFloat(v.bid.toFixed(2)) : existing.price));
       if (!newPrice) return;
@@ -248,6 +493,13 @@ class TVStreamer {
       const priceLocation = newPrice > 0 ? parseFloat(((newPrice - low) / dayRange).toFixed(4)) : 0.5;
       const pivotP = parseFloat(((high + low + newPrice) / 3).toFixed(2));
 
+      // Update institutional true session VWAP & CVD
+      const isAggressiveBuy = newPrice >= ask || (existing.price && newPrice >= existing.price);
+      updateSessionVWAP(newPrice, v.volume || 1, isAggressiveBuy);
+
+      // Compute Smart Money Technique (SMT) Divergence against Silver
+      const smt = computeSMTDivergence();
+
       const goldData = {
         symbol: 'GC=F',
         label: 'XAU/USD',
@@ -270,6 +522,17 @@ class TVStreamer {
         updatedAt: new Date().toISOString(),
         latency: 'REALTIME_WEBSOCKET',
         source: 'OANDA:XAUUSD_STREAM',
+        authoritativeSource: 'OANDA:XAUUSD (Primary)',
+        vwap: sessionVWAP,
+        vwapUpper: parseFloat((sessionVWAP + sessionVWAPDev).toFixed(2)),
+        vwapLower: parseFloat((sessionVWAP - sessionVWAPDev).toFixed(2)),
+        cvd: sessionCumDelta,
+        smtDivergence: smt,
+        paxgLead: latestPaxgPrice > 0 ? {
+          price: latestPaxgPrice,
+          diff: parseFloat((latestPaxgPrice - newPrice).toFixed(2)),
+          status: latestPaxgPrice > newPrice + 0.40 ? 'PAXG_LEADING_UP' : latestPaxgPrice < newPrice - 0.40 ? 'PAXG_LEADING_DOWN' : 'PARITY',
+        } : null,
         intervals: { ...this.intervalChanges },
       };
 
@@ -407,7 +670,7 @@ class TVStreamer {
 async function fetchLiveGoldSpot() {
   // Tier 1: TradingView OANDA scanner
   try {
-    const res = await axios.get('https://scanner.tradingview.com/symbol?symbol=OANDA:XAUUSD&fields=close,change,change_abs,open,high,low,volume,bid,ask', {
+    const res = await fastAxios.get('https://scanner.tradingview.com/symbol?symbol=OANDA:XAUUSD&fields=close,change,change_abs,open,high,low,volume,bid,ask', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Origin': 'https://www.tradingview.com',
@@ -437,7 +700,7 @@ async function fetchLiveGoldSpot() {
 
   // Tier 2: Gold-API.com live spot
   try {
-    const res = await axios.get('https://api.gold-api.com/price/XAU', { timeout: 2500 });
+    const res = await fastAxios.get('https://api.gold-api.com/price/XAU', { timeout: 2500 });
     if (res.data?.price) {
       const p = parseFloat(res.data.price);
       return {
@@ -457,7 +720,7 @@ async function fetchLiveGoldSpot() {
 
   // Tier 3: Binance PAXGUSDT spot proxy
   try {
-    const res = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT', { timeout: 2000 });
+    const res = await fastAxios.get('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT', { timeout: 2000 });
     if (res.data?.price) {
       const p = parseFloat(res.data.price);
       return {
@@ -483,7 +746,7 @@ async function fetchLiveGoldSpot() {
  */
 async function fetchLiveSilverSpot() {
   try {
-    const res = await axios.get('https://scanner.tradingview.com/symbol?symbol=TVC:SILVER&fields=close,change,change_abs,open,high,low,volume,bid,ask', {
+    const res = await fastAxios.get('https://scanner.tradingview.com/symbol?symbol=TVC:SILVER&fields=close,change,change_abs,open,high,low,volume,bid,ask', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Origin': 'https://www.tradingview.com',
@@ -512,7 +775,7 @@ async function fetchLiveSilverSpot() {
   } catch (_) {}
 
   try {
-    const res = await axios.get('https://api.gold-api.com/price/XAG', { timeout: 2500 });
+    const res = await fastAxios.get('https://api.gold-api.com/price/XAG', { timeout: 2500 });
     if (res.data?.price) {
       const p = parseFloat(res.data.price);
       return {
@@ -576,7 +839,7 @@ async function fetchAllPrices() {
       const goldData = {
         symbol: 'GC=F',
         label: 'XAU/USD',
-        description: 'Spot Gold (OANDA:XAUUSD)',
+        description: 'Spot Gold (OANDA:XAUUSD Fallback)',
         unit: 'USD/oz',
         correlation: 'primary',
         price: goldPrice,
@@ -593,6 +856,7 @@ async function fetchAllPrices() {
         updatedAt: new Date().toISOString(),
         latency: 'REALTIME_HTTP',
         source: liveGold.source || 'HTTP_FALLBACK',
+        authoritativeSource: 'OANDA:XAUUSD (Scanner Fallback)',
         intervals: {
           '1': prevIntervals['1'] || { ch: 0, chp: 0 },
           '5': prevIntervals['5'] || { ch: parseFloat(((goldPrice * change5m) / 100).toFixed(2)), chp: parseFloat(change5m.toFixed(2)) },
@@ -716,6 +980,11 @@ function start() {
     ]);
   }
 
+  // Start Binance PAXG 24/7 sub-10ms stream as hot standby & lead detector
+  if (!binanceStreamer) {
+    binanceStreamer = new BinancePAXGStreamer();
+  }
+
   // Seed historical chart bars if available
   seedHistoricalPrices();
 
@@ -731,6 +1000,10 @@ function stop() {
     tvStreamer.stop();
     tvStreamer = null;
   }
+  if (binanceStreamer) {
+    binanceStreamer.stop();
+    binanceStreamer = null;
+  }
   if (broadcastThrottleTimer) {
     clearTimeout(broadcastThrottleTimer);
     broadcastThrottleTimer = null;
@@ -742,4 +1015,4 @@ function getLatest() {
   return latestPrices;
 }
 
-module.exports = { init, start, stop, getLatest };
+module.exports = { init, start, stop, getLatest, computeSMTDivergence };

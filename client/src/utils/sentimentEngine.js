@@ -53,11 +53,33 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
   const totalMacroDrag = Math.max(-35, Math.min(35, dxyDrag + yldDrag));
   const macroScore = Math.max(10, Math.min(90, Math.round(50 - totalMacroDrag)));
 
-  // 3. Real-Time Intraday Momentum & VWAP Flow (20% weight)
-  // Sub-second quantitative order flow: distance to session VWAP proxy, 1m/5m/15m multi-horizon velocity, and Gold/Silver beta
-  const vwapProxy = (goldHigh + goldLow + spotPrice + goldOpen) / 4;
-  const vwapDist = vwapProxy > 0 ? ((spotPrice - vwapProxy) / vwapProxy) * 100 : 0;
+  // 3. Real-Time Intraday Momentum, Session VWAP & CVD Flow (20% weight)
+  // Sub-second quantitative order flow: distance to true session VWAP, Cumulative Volume Delta, 1m/5m/15m multi-horizon velocity, and Gold/Silver beta
+  const sessionVWAP = parseFloat(gold.sessionVWAP || 0);
+  const vwapBenchmark = sessionVWAP > 0 ? sessionVWAP : ((goldHigh + goldLow + spotPrice + goldOpen) / 4);
+  const vwapDist = vwapBenchmark > 0 ? ((spotPrice - vwapBenchmark) / vwapBenchmark) * 100 : 0;
   const vwapPoints = Math.max(-25, Math.min(25, vwapDist * 50));
+
+  // Cumulative Volume Delta (CVD) order aggression
+  const rawCvd = parseFloat(gold.cvd || 0);
+  const cvdDelta = Math.max(-12, Math.min(12, (rawCvd / 100) * 8));
+
+  // Smart Money Technique (SMT) Divergence
+  const smt = gold.smtDivergence || {};
+  let smtPoints = 0;
+  if (smt.status === 'BULLISH_SMT') {
+    smtPoints = 10; // Gold higher low vs Silver lower low = smart money accumulation
+  } else if (smt.status === 'BEARISH_SMT') {
+    smtPoints = -10; // Gold lower high vs Silver higher high = smart money distribution
+  }
+
+  // Multi-Timeframe (1H/4H) Trend Filter
+  let htfFilter = 0;
+  if (goldChg1h < -0.35 && goldChg5m > 0) {
+    htfFilter = -8; // Counter-trend bounce into strong 1H downtrend -> high failure rate
+  } else if (goldChg1h > 0.35 && goldChg5m < 0) {
+    htfFilter = 8; // Pullback in strong 1H uptrend -> institutional dip buy
+  }
 
   const goldChg1m = parseFloat(gold.intervals?.['1']?.chp ?? goldChg5m);
   const silver = prices['SI=F'] || prices['XAGUSD'] || {};
@@ -65,10 +87,13 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
   const silverBetaSpread = silverChg5m - goldChg5m;
 
   const trendFlowVelocity =
-    (goldChg1m * 25) +
-    (goldChg5m * 25) +
-    (goldChg15m * 15) +
+    (goldChg1m * 22) +
+    (goldChg5m * 22) +
+    (goldChg15m * 14) +
     vwapPoints +
+    cvdDelta +
+    smtPoints +
+    htfFilter +
     (silverBetaSpread * 6);
 
   const trendFlowScore = Math.max(10, Math.min(90, Math.round(50 + trendFlowVelocity)));
@@ -162,7 +187,7 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
     components: [
       { label: 'Gold Momentum (25%)', val: Math.round(momentumScore) },
       { label: 'Macro Inverse Yield (25%)', val: Math.round(macroScore) },
-      { label: 'Trend & VWAP Flow (20%)', val: Math.round(trendFlowScore) },
+      { label: 'Trend & VWAP/CVD (20%)', val: Math.round(trendFlowScore) },
       { label: 'Catalyst Risk (15%)', val: Math.round(eventScore) },
       { label: 'CFTC COT Spec (15%)', val: Math.round(cotScore) },
     ],
@@ -288,6 +313,20 @@ export function analyzeTraderPsychology({ prices = {}, newsFeed = [], calendarDa
     deskNote = `Bullion is maintaining premium pricing (${(priceLocation * 100).toFixed(0)}% of day range) above session equilibrium. Institutional desks look to accumulate shallow pullbacks.`;
   }
 
+  // SMT Divergence & True Session VWAP/CVD
+  const smt = gold.smtDivergence || {};
+  const sessionVWAP = parseFloat(gold.sessionVWAP || 0);
+  const cvd = parseFloat(gold.cvd || 0);
+  const goldChg1h = parseFloat(gold.intervals?.['60']?.chp ?? (goldChg5m * 1.5));
+
+  if (smt.status === 'BEARISH_SMT') {
+    deskNote = `[SMT DIVERGENCE: BEARISH DISPATCH] ${smt.note || 'Gold showing relative weakness vs Silver at highs'}. ${deskNote}`;
+    if (regimeType === 'BULL') psychologyScore = Math.max(30, psychologyScore - 15);
+  } else if (smt.status === 'BULLISH_SMT') {
+    deskNote = `[SMT DIVERGENCE: BULLISH ACCUMULATION] ${smt.note || 'Gold holding higher low while Silver made lower low'}. ${deskNote}`;
+    if (regimeType === 'BEAR') psychologyScore = Math.min(70, psychologyScore + 15);
+  }
+
   // 4. Tactical Execution Badges
   const badges = [
     {
@@ -347,6 +386,40 @@ export function analyzeTraderPsychology({ prices = {}, newsFeed = [], calendarDa
         ? 'Target sell liquidity pools'
         : 'Avoid mid-range chop',
       color: regimeType === 'BULL' ? 'var(--bull-primary)' : regimeType === 'BEAR' ? 'var(--bear-primary)' : 'var(--text-dim)',
+    },
+    {
+      label: 'SMT DIVERGENCE (AU/AG)',
+      value: smt.status === 'BULLISH_SMT'
+        ? 'BULLISH SMT'
+        : smt.status === 'BEARISH_SMT'
+        ? 'BEARISH SMT'
+        : 'NEUTRAL / CORRELATED',
+      detail: smt.note || 'Gold & Silver tracking correlated swings',
+      color: smt.status === 'BULLISH_SMT'
+        ? 'var(--bull-primary)'
+        : smt.status === 'BEARISH_SMT'
+        ? 'var(--bear-primary)'
+        : 'var(--text-dim)',
+    },
+    {
+      label: 'SESSION VWAP & CVD',
+      value: sessionVWAP > 0 ? `$${sessionVWAP.toFixed(2)}` : 'VWAP COMPUTING',
+      detail: cvd !== 0
+        ? `CVD: ${cvd > 0 ? '+' : ''}${cvd.toFixed(0)} (${cvd > 0 ? 'Aggressive Buyers' : 'Aggressive Sellers'})`
+        : 'Balanced Order Delta',
+      color: sessionVWAP > 0 && spotPrice >= sessionVWAP ? 'var(--bull-primary)' : 'var(--bear-primary)',
+    },
+    {
+      label: '1H HTF MSS ALIGNMENT',
+      value: goldChg1h > 0.25
+        ? 'BULLISH CONTINUATION'
+        : goldChg1h < -0.25
+        ? 'BEARISH EXPANSION'
+        : 'BALANCED STRUCTURE',
+      detail: Math.abs(goldChg1h) > 0.35 && (goldChg1h * goldChg5m < 0)
+        ? 'Caution: Counter-Trend 5M Scalp'
+        : `1H Trend: ${goldChg1h >= 0 ? '+' : ''}${goldChg1h.toFixed(2)}%`,
+      color: goldChg1h > 0.25 ? 'var(--bull-primary)' : goldChg1h < -0.25 ? 'var(--bear-primary)' : 'var(--gold-primary)',
     },
   ];
 

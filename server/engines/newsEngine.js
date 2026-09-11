@@ -3,6 +3,8 @@
 // Polls tier-1 live feeds (Investing.com, Al Jazeera, BBC, CNBC, FXStreet, ForexLive),
 // enforces strict timestamp ordering, rejects stale previous-day news, and broadcasts in real-time.
 
+const http = require('http');
+const https = require('https');
 const Parser = require('rss-parser');
 const config = require('../config');
 const { isGoldRelevant, relevanceScore } = require('../utils/goldFilter');
@@ -10,8 +12,14 @@ const aiOrchestrator = require('../utils/aiOrchestrator');
 const telegramEngine = require('./telegramEngine');
 const newsArchive = require('../utils/newsArchive');
 
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
+
 const parser = new Parser({
-  timeout: 4500, // 4.5-second cutoff to prevent hanging connections
+  timeout: 3800, // 3.8-second cutoff to prevent hanging connections
+  requestOptions: {
+    agent: (parsedUrl) => (parsedUrl.protocol === 'http:' ? httpAgent : httpsAgent),
+  },
   headers: {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
     'Accept': 'application/rss+xml, application/xml, text/xml, */*',
@@ -85,18 +93,21 @@ function classifyInstantGoldNews(title, summary, source = '') {
 
   // Bearish signals for Gold (Strength in USD, Yields, Hawkish Central Banks, Ceasefire, Selloffs)
   const bearishPatterns = [
+    { regex: /\b(surprise rate hike|emergency hike|hikes 50bps|hikes 75bps|aggressive tightening|shock hike)\b/, weight: 5, reason: 'Aggressive central bank rate hike shock creates heavy headwind for gold' },
     { regex: /\b(rate hike|hike rates|hawkish|higher for longer|delay rate cut|cuts delayed|no rate cut|paring cut)\b/, weight: 4, reason: 'Hawkish Fed interest rate stance reduces bullion appeal' },
     { regex: /\b(dollar (surges|rallies|jumps|strengthens|climbs|firms|hits high)|dxy (surges|rallies|jumps|high)|strong dollar|usd gains)\b/, weight: 4, reason: 'US Dollar surge creates immediate direct headwind for gold' },
     { regex: /\b(yields? (surge|spike|climb|jump|rise)|treasury yields? up|10-year yield jumps)\b/, weight: 3, reason: 'Rising US Treasury yields increase the opportunity cost of holding non-yielding gold' },
     { regex: /\b(cpi (jumps|heats up|accelerates|rises|beats)|hot inflation|inflation stubbornly high)\b/, weight: 3, reason: 'Hotter inflation elevates sticky Fed rate policy expectations' },
     { regex: /\b(nfp beats|strong payrolls|jobs beat|jobless claims drop|unemployment falls)\b/, weight: 3, reason: 'Robust US employment data dampens aggressive easing expectations' },
     { regex: /\b(gold (slumps|plunges|slides|sinks|drops|falls|retreats|tumbl|selloff)|gold bears|liquidation cascade)\b/, weight: 3, reason: 'Technical selling momentum and order book liquidation pressure' },
-    { regex: /\b(ceasefire|peace talks|de-escalat|tensions ease|diplomacy|deal reached)\b/, weight: 3, reason: 'Geopolitical de-escalation unwinds safe-haven risk premia' },
+    { regex: /\b(ceasefire|peace talks|de-escalat|tensions ease|diplomacy|deal reached)\b/, weight: 4, reason: 'Geopolitical de-escalation unwinds safe-haven risk premia' },
     { regex: /\b(risk-on|stocks (rally|surge|jump)|equities surge|wall st gains)\b/, weight: 2, reason: 'Risk-on equity flow diverts institutional capital away from defensive assets' },
   ];
 
   // Bullish signals for Gold (Weak USD, Rate cuts, Dovish Fed, Geopolitical war/escalation, Safe-haven, CB buying)
   const bullishPatterns = [
+    { regex: /\b(emergency rate cut|cuts 50bps|cuts 75bps|slashes rates|cuts 50 bps|inter-meeting cut|massive stimulus)\b/, weight: 5, reason: 'Aggressive emergency monetary easing and jumbo rate cuts directly propel bullion' },
+    { regex: /\b(nuclear|closed strait of hormuz|strait of hormuz blocked|oil embargo|declaration of war|expanded war)\b/, weight: 5, reason: 'Severe systemic geopolitical shock drives flight into hard assets' },
     { regex: /\b(rate cut|fed cuts|cuts rates|dovish|monetary easing|easier policy|policy easing)\b/, weight: 4, reason: 'Fed monetary easing and rate cuts directly boost non-yielding bullion demand' },
     { regex: /\b(dollar (slides|drops|plunges|weakens|tumbles|falls|slumps)|weak dollar|dxy (drops|slides|falls|plunges)|usd drops)\b/, weight: 4, reason: 'US Dollar weakness directly inflates dollar-denominated gold purchasing power' },
     { regex: /\b(yields? (plunge|slide|fall|drop|tumble)|treasury yields? sink|10-year yield falls)\b/, weight: 3, reason: 'Falling sovereign yields diminish bond competition against gold reserves' },
@@ -244,55 +255,57 @@ function processFeedItems(rawItems) {
   return newlyAccepted.length;
 }
 
-// Resilient Serialized AI Scoring Queue
+// High-Throughput Concurrent AI Scoring Worker Pool (Zero Artificial Sleep Lag)
 const scoringQueue = [];
-let isQueueProcessing = false;
+const CONCURRENT_WORKERS = 3;
+let activeWorkers = 0;
 
 function enqueueForScoring(newsItem, rawItem) {
-  if (scoringQueue.length >= 20) {
+  if (scoringQueue.length >= 30) {
     scoringQueue.shift();
   }
   scoringQueue.push({ newsItem, rawItem });
   processScoringQueue();
 }
 
-async function processScoringQueue() {
-  if (isQueueProcessing || scoringQueue.length === 0) return;
-  isQueueProcessing = true;
-
-  while (scoringQueue.length > 0) {
-    const { newsItem, rawItem } = scoringQueue.shift();
-    try {
-      const aiSentiment = await aiOrchestrator.scoreNewsItem(rawItem.title, rawItem.summary, rawItem.source);
-      if (aiSentiment && aiSentiment.bias) {
-        newsItem.reasoning = aiSentiment.reasoning || newsItem.reasoning;
-        newsItem.impact = aiSentiment.impact || newsItem.impact;
-        newsItem.bias = aiSentiment.bias || newsItem.bias;
-        newsItem.model = aiSentiment.model;
-        newsItem.provider = aiSentiment.provider;
-
-        try {
-          newsArchive.updateItem(newsItem);
-        } catch (_) {}
-
-        // Broadcast updated sentiment dynamically to update client market bias
-        if (io) {
-          io.emit('news_item_update', newsItem);
-        }
-
-        // High-impact alert trigger
-        if (newsItem.impact === 'HIGH') {
-          telegramEngine.sendNewsAlert(newsItem).catch((err) =>
-            console.error('[NEWS] Telegram alert error:', err.message)
-          );
-        }
-      }
-    } catch (_) {}
-
-    await new Promise((r) => setTimeout(r, 250));
+function processScoringQueue() {
+  while (activeWorkers < CONCURRENT_WORKERS && scoringQueue.length > 0) {
+    activeWorkers++;
+    const task = scoringQueue.shift();
+    scoreSingleItem(task).finally(() => {
+      activeWorkers--;
+      processScoringQueue();
+    });
   }
+}
 
-  isQueueProcessing = false;
+async function scoreSingleItem({ newsItem, rawItem }) {
+  try {
+    const aiSentiment = await aiOrchestrator.scoreNewsItem(rawItem.title, rawItem.summary, rawItem.source);
+    if (aiSentiment && aiSentiment.bias) {
+      newsItem.reasoning = aiSentiment.reasoning || newsItem.reasoning;
+      newsItem.impact = aiSentiment.impact || newsItem.impact;
+      newsItem.bias = aiSentiment.bias || newsItem.bias;
+      newsItem.model = aiSentiment.model;
+      newsItem.provider = aiSentiment.provider;
+
+      try {
+        newsArchive.updateItem(newsItem);
+      } catch (_) {}
+
+      // Broadcast updated sentiment dynamically to update client market bias
+      if (io) {
+        io.emit('news_item_update', newsItem);
+      }
+
+      // High-impact alert trigger
+      if (newsItem.impact === 'HIGH') {
+        telegramEngine.sendNewsAlert(newsItem).catch((err) =>
+          console.error('[NEWS] Telegram alert error:', err.message)
+        );
+      }
+    }
+  } catch (_) {}
 }
 
 /**

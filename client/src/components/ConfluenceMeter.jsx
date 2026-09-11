@@ -118,20 +118,31 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
 
     const techVal = Math.max(10, Math.min(90, Math.round(50 + techDelta)));
 
-    // 4. Real-Time Intraday Momentum & VWAP Flow Vector (18% weight)
-    // 100% pure quantitative sub-second order flow: distance to session VWAP proxy, 1m/5m/15m multi-interval velocity, and Silver beta
-    const vwapProxy = (goldHigh + goldLow + spotPrice + goldOpen) / 4;
-    const vwapDist = vwapProxy > 0 ? ((spotPrice - vwapProxy) / vwapProxy) * 100 : 0;
+    // 4. Real-Time Intraday Momentum, True Session VWAP, CVD & SMT Vector (18% weight)
+    // Sub-second quantitative order flow: distance to true session VWAP, Cumulative Volume Delta, SMT divergence, and Silver beta
+    const sessionVWAP = parseFloat(gold.sessionVWAP || 0);
+    const vwapBenchmark = sessionVWAP > 0 ? sessionVWAP : ((goldHigh + goldLow + spotPrice + goldOpen) / 4);
+    const vwapDist = vwapBenchmark > 0 ? ((spotPrice - vwapBenchmark) / vwapBenchmark) * 100 : 0;
     const vwapPoints = Math.max(-25, Math.min(25, vwapDist * 55));
+
+    const rawCvd = parseFloat(gold.cvd || 0);
+    const cvdDelta = Math.max(-12, Math.min(12, (rawCvd / 100) * 10));
+
+    const smt = gold.smtDivergence || {};
+    let smtPoints = 0;
+    if (smt.status === 'BULLISH_SMT') smtPoints = 12;
+    else if (smt.status === 'BEARISH_SMT') smtPoints = -12;
 
     const goldChg1m = parseFloat(gold.intervals?.['1']?.chp ?? goldChg5m);
 
     const momentumFlowVelocity =
-      (goldChg1m * 26) +
-      (goldChg5m * 26) +
-      (goldChg15m * 14) +
+      (goldChg1m * 22) +
+      (goldChg5m * 22) +
+      (goldChg15m * 12) +
       vwapPoints +
-      (silverBetaSpread * 6);
+      cvdDelta +
+      smtPoints +
+      (silverBetaSpread * 5);
 
     const momentumFlowVal = Math.max(10, Math.min(90, Math.round(50 + momentumFlowVelocity)));
 
@@ -226,6 +237,9 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
       wCot,
       imminentEventWarning,
       psychAnalysis,
+      smt,
+      sessionVWAP,
+      cvd: rawCvd,
     };
   }, [prices, newsFeed, calendarData, cotData]);
 
@@ -263,6 +277,27 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     }
   }, [calculation.composite, calculation.psychAnalysis?.regime]);
 
+  // Voice Alert on SMT Divergence Shift
+  const lastSmtRef = useRef('NEUTRAL');
+  useEffect(() => {
+    const smtStatus = calculation.smt?.status;
+    if (smtStatus && smtStatus !== 'NEUTRAL' && smtStatus !== lastSmtRef.current) {
+      lastSmtRef.current = smtStatus;
+      const isBull = smtStatus === 'BULLISH_SMT';
+      speakSquawk(
+        `Smart Money Divergence Alert. ${isBull ? 'Bullish SMT accumulation' : 'Bearish SMT distribution'} confirmed between Gold and Silver order flow.`,
+        {
+          category: 'confluence',
+          preChime: isBull ? 'confluence' : 'bearish',
+          dedupeKey: `smt_alert_${smtStatus}`,
+          cooldownSeconds: 300,
+        }
+      );
+    } else if (smtStatus === 'NEUTRAL') {
+      lastSmtRef.current = 'NEUTRAL';
+    }
+  }, [calculation.smt?.status]);
+
   // Slim 6px ring arc dimensions
   const radius = 46;
   const circumference = 2 * Math.PI * radius;
@@ -279,7 +314,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
   const factors = [
     { label: `SMC Liquidity Flow (${isTrend ? '35%' : '22%'})`, value: calculation.techVal },
     { label: `Trader Psychology & Traps (${isTrend ? '30%' : '22%'})`, value: calculation.psychologyVal },
-    { label: `Real-Time Momentum Flow (${isTrend ? '20%' : '18%'})`, value: calculation.momentumFlowVal },
+    { label: `Real-Time VWAP, CVD & SMT Flow (${isTrend ? '20%' : '18%'})`, value: calculation.momentumFlowVal },
     { label: `Macro & Yields (${isTrend ? '10%' : '24%'})`, value: calculation.macroVal },
     { label: `CFTC Institutional COT (${isTrend ? '5%' : '14%'})`, value: calculation.cotVal },
   ];
@@ -291,16 +326,37 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
           <Compass size={13} style={{ color: strokeColor }} />
           INSTITUTIONAL CONFLUENCE &amp; MARKET BIAS
         </span>
-        <span
-          style={{
-            fontSize: '11px',
-            fontFamily: 'var(--font-mono)',
-            fontWeight: 600,
-            color: strokeColor,
-          }}
-        >
-          {calculation.composite}/100
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span
+            style={{
+              fontSize: '9px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: '3px',
+              background: 'rgba(245, 158, 11, 0.1)',
+              color: 'var(--gold-primary)',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title="Institutional Confluence is anchored to the primary OANDA:XAUUSD spot chart"
+          >
+            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--gold-primary)', display: 'inline-block' }} />
+            OANDA:XAUUSD ANCHOR
+          </span>
+          <span
+            style={{
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              color: strokeColor,
+            }}
+          >
+            {calculation.composite}/100
+          </span>
+        </div>
       </div>
 
       <div className="confluence-gauge-container">

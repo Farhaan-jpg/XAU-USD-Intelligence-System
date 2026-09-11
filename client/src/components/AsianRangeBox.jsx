@@ -123,6 +123,39 @@ export default function AsianRangeBox({ prices = {} }) {
     if (spotPrice > high) regime = 'BULLISH_EXPANSION_ABOVE';
     else if (spotPrice < low) regime = 'BEARISH_EXPANSION_BELOW';
 
+    // Automated ICT London "Judas Swing" Detection (07:00 - 11:00 UTC)
+    let judasSetup = null;
+    const nowUtcHour = new Date().getUTCHours();
+    const isLondonOrNY = nowUtcHour >= 7 && nowUtcHour <= 16;
+
+    if (rangeState.locked && isLondonOrNY) {
+      if (rangeState.bslSwept && spotPrice < high && spotPrice >= low) {
+        judasSetup = {
+          type: 'BEARISH_JUDAS',
+          label: 'CONFIRMED BEARISH JUDAS SWING (SWEEP & RECLAIM)',
+          detail: `Asian High ($${high.toFixed(2)}) was swept and reclaimed at $${spotPrice.toFixed(2)}. Trapped breakout buyers in a fakeout. Smart money targeting Asian Equilibrium ($${eq.toFixed(2)}) and Asian Low ($${low.toFixed(2)}).`,
+          target: low.toFixed(2),
+          invalidation: rangeState.bslSweptPrice ? rangeState.bslSweptPrice.toFixed(2) : (high + 2.5).toFixed(2),
+          bias: 'BEARISH',
+          color: 'var(--bear-primary)',
+          bg: 'var(--bear-bg)',
+          border: 'var(--border-bear)',
+        };
+      } else if (rangeState.sslSwept && spotPrice > low && spotPrice <= high) {
+        judasSetup = {
+          type: 'BULLISH_JUDAS',
+          label: 'CONFIRMED BULLISH JUDAS SWING (SWEEP & RECLAIM)',
+          detail: `Asian Low ($${low.toFixed(2)}) was swept and reclaimed at $${spotPrice.toFixed(2)}. Trapped breakdown sellers in a stop-run trap. Smart money targeting Asian Equilibrium ($${eq.toFixed(2)}) and Asian High ($${high.toFixed(2)}).`,
+          target: high.toFixed(2),
+          invalidation: rangeState.sslSweptPrice ? rangeState.sslSweptPrice.toFixed(2) : (low - 2.5).toFixed(2),
+          bias: 'BULLISH',
+          color: 'var(--bull-primary)',
+          bg: 'var(--bull-bg)',
+          border: 'var(--border-bull)',
+        };
+      }
+    }
+
     return {
       high: high.toFixed(2),
       low: low.toFixed(2),
@@ -136,8 +169,9 @@ export default function AsianRangeBox({ prices = {} }) {
       distToLow: distToLow.toFixed(2),
       distToEq: distToEq.toFixed(2),
       regime,
+      judasSetup,
     };
-  }, [rangeState.high, rangeState.low, spotPrice]);
+  }, [rangeState.high, rangeState.low, rangeState.locked, rangeState.bslSwept, rangeState.sslSwept, rangeState.bslSweptPrice, rangeState.sslSweptPrice, spotPrice]);
 
   return (
     <div className="panel-card">
@@ -165,6 +199,37 @@ export default function AsianRangeBox({ prices = {} }) {
           </span>
         </div>
       </div>
+
+      {/* Judas Swing Alert Banner */}
+      {calculations.judasSetup && (
+        <div
+          style={{
+            padding: '8px 10px',
+            borderRadius: 'var(--radius-sm)',
+            background: calculations.judasSetup.bg,
+            border: `1px solid ${calculations.judasSetup.border}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            marginBottom: '4px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ShieldAlert size={13} style={{ color: calculations.judasSetup.color }} />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: calculations.judasSetup.color }}>
+                {calculations.judasSetup.label}
+              </span>
+            </div>
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: calculations.judasSetup.color }}>
+              TARGET: ${calculations.judasSetup.target} | INVALIDATION: ${calculations.judasSetup.invalidation}
+            </span>
+          </div>
+          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+            {calculations.judasSetup.detail}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
         {/* Box Core Metrics */}

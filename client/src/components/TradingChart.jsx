@@ -81,7 +81,7 @@ export default function TradingChart({ prices = {} }) {
       {/* Integrated Single-Row Price, Ticker, Pivots, and Timeframe Header */}
       <div className="chart-price-ticker-row">
         {/* Left: Spot Price & Live Metrics */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <div className="spot-price-big">
             <span className={`spot-price-value ${tickDirection === 'up' ? 'tick-flash-up' : tickDirection === 'down' ? 'tick-flash-down' : ''}`}>
               ${spotPrice > 0 ? spotPrice.toFixed(2) : '--'}
@@ -94,6 +94,26 @@ export default function TradingChart({ prices = {} }) {
             </span>
           </div>
 
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              padding: '2px 7px',
+              borderRadius: '3px',
+              background: 'rgba(245, 158, 11, 0.12)',
+              color: 'var(--gold-primary)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+            }}
+            title="Authoritative High-Probability Execution Chart: OANDA Spot Gold"
+          >
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--gold-primary)', boxShadow: '0 0 6px var(--gold-primary)' }} />
+            OANDA:XAUUSD (PRIMARY)
+          </div>
+
           {bid && ask && (
             <div className="spot-price-meta">
               <span>BID <strong style={{ color: 'var(--text-main)' }}>${bid}</strong></span>
@@ -104,8 +124,49 @@ export default function TradingChart({ prices = {} }) {
           )}
         </div>
 
-        {/* Center: Clean Monospace Floor Pivots Ribbon */}
+        {/* Center: Clean Monospace Floor Pivots & Order Flow Ribbon */}
         <div className="chart-pivots-ribbon">
+          {gold.sessionVWAP > 0 && (
+            <span
+              className="pivot-tag"
+              style={{
+                borderColor: 'rgba(56, 189, 248, 0.35)',
+                color: 'var(--cyan-primary)',
+                background: 'rgba(56, 189, 248, 0.08)',
+                fontWeight: 600,
+              }}
+              title="True Rolling Session VWAP (OANDA Order Flow)"
+            >
+              VWAP ${(parseFloat(gold.sessionVWAP)).toFixed(2)}
+            </span>
+          )}
+          {gold.cvd !== undefined && gold.cvd !== 0 && (
+            <span
+              className="pivot-tag"
+              style={{
+                borderColor: gold.cvd > 0 ? 'rgba(16, 185, 129, 0.35)' : 'rgba(244, 63, 94, 0.35)',
+                color: gold.cvd > 0 ? 'var(--bull-primary)' : 'var(--bear-primary)',
+                background: gold.cvd > 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(244, 63, 94, 0.08)',
+              }}
+              title="Cumulative Volume Delta"
+            >
+              CVD {gold.cvd > 0 ? '+' : ''}{gold.cvd.toFixed(0)}
+            </span>
+          )}
+          {gold.smtDivergence?.status && gold.smtDivergence.status !== 'NEUTRAL' && (
+            <span
+              className="pivot-tag"
+              style={{
+                borderColor: gold.smtDivergence.status === 'BULLISH_SMT' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)',
+                color: gold.smtDivergence.status === 'BULLISH_SMT' ? 'var(--bull-primary)' : 'var(--bear-primary)',
+                background: gold.smtDivergence.status === 'BULLISH_SMT' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                fontWeight: 700,
+              }}
+              title={gold.smtDivergence.note}
+            >
+              {gold.smtDivergence.status === 'BULLISH_SMT' ? '▲ BULL SMT' : '▼ BEAR SMT'}
+            </span>
+          )}
           <span className="pivot-tag r2" title="Resistance 2">R2 ${pivots.r2}</span>
           <span className="pivot-tag r1" title="Resistance 1">R1 ${pivots.r1}</span>
           <span className="pivot-tag p" title="Equilibrium Pivot">P ${pivots.p}</span>

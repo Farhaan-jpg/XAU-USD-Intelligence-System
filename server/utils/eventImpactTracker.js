@@ -49,6 +49,77 @@ function init(socketIo) {
   loadPersistedImpacts();
 }
 
+function parseEconomicValue(valStr) {
+  if (!valStr || typeof valStr !== 'string') return null;
+  const clean = valStr.trim().replace(/,/g, '');
+  const num = parseFloat(clean);
+  if (isNaN(num)) return null;
+  const lower = clean.toLowerCase();
+  if (lower.includes('k')) return num * 1000;
+  if (lower.includes('m')) return num * 1000000;
+  if (lower.includes('b')) return num * 1000000000;
+  if (lower.includes('%')) return num;
+  return num;
+}
+
+/**
+ * Standardized Economic Surprise Index (sigma-deviation scoring)
+ * Normalizes (Actual - Forecast) / typical volatility to predict Gold market displacement
+ */
+function calculateStandardizedSurprise(title = '', currency = 'USD', actualStr = '', forecastStr = '') {
+  const actual = parseEconomicValue(actualStr);
+  const forecast = parseEconomicValue(forecastStr);
+  if (actual === null || forecast === null) {
+    return { surpriseZ: 0, bias: 'NEUTRAL', label: 'IN_LINE', magnitude: 'NO_DEVIATION' };
+  }
+
+  const rawDiff = actual - forecast;
+  const t = title.toUpperCase();
+
+  // Determine standard deviation benchmark
+  let sigma = 1;
+  let higherIsBullishForGold = false; // For USD, stronger data strengthens USD -> Bearish for Gold
+
+  if (t.includes('UNEMPLOYMENT') || t.includes('CLAIM') || t.includes('JOBLESS')) {
+    higherIsBullishForGold = true;
+    sigma = t.includes('CLAIM') ? 12000 : 0.2;
+  } else if (t.includes('NFP') || t.includes('NON-FARM') || t.includes('PAYROLL')) {
+    sigma = 40000;
+  } else if (t.includes('CPI') || t.includes('PCE') || t.includes('INFLATION') || t.includes('PPI')) {
+    sigma = 0.2;
+  } else if (t.includes('RATE') || t.includes('FUNDS') || t.includes('FOMC')) {
+    sigma = 0.25;
+  } else if (t.includes('GDP')) {
+    sigma = 0.4;
+  } else if (t.includes('PMI')) {
+    sigma = 1.2;
+  } else {
+    sigma = Math.max(0.1, Math.abs(forecast) * 0.08);
+  }
+
+  const zScore = parseFloat((rawDiff / (sigma || 1)).toFixed(2));
+  const goldDirection = higherIsBullishForGold ? (zScore > 0 ? 'BULLISH' : 'BEARISH') : (zScore > 0 ? 'BEARISH' : 'BULLISH');
+  const absZ = Math.abs(zScore);
+
+  let label = 'IN_LINE';
+  if (absZ >= 2.0) {
+    label = goldDirection === 'BULLISH' ? 'EXTREME_BULLISH_SURPRISE' : 'EXTREME_BEARISH_SURPRISE';
+  } else if (absZ >= 0.8) {
+    label = goldDirection === 'BULLISH' ? 'MODERATE_BULLISH_SURPRISE' : 'MODERATE_BEARISH_SURPRISE';
+  }
+
+  return {
+    actual,
+    forecast,
+    rawDiff: parseFloat(rawDiff.toFixed(2)),
+    zScore,
+    bias: absZ >= 0.5 ? goldDirection : 'NEUTRAL',
+    label,
+    magnitude: absZ >= 2.0 ? 'EXTREME' : absZ >= 0.8 ? 'ELEVATED' : 'MODERATE',
+    summary: `${title} (${currency}): Actual ${actualStr} vs Forecast ${forecastStr} (${zScore >= 0 ? '+' : ''}${zScore}σ deviation) -> ${label}`,
+  };
+}
+
 /**
  * Classify market price displacement
  */
@@ -139,6 +210,12 @@ function checkEvents(calendarEvents, currentPrice) {
       existing.netPercent = parseFloat((base > 0 ? (existing.netChange / base) * 100 : 0).toFixed(3));
       const range = (existing.maxPrice || currentPrice) - (existing.minPrice || currentPrice);
       existing.classification = classifyImpact(existing.netChange, range);
+
+      // Standardized Surprise Index
+      if (existing.actual && existing.forecast) {
+        existing.surprise = calculateStandardizedSurprise(existing.title, existing.currency, existing.actual, existing.forecast);
+      }
+
       existing.lastUpdated = new Date().toISOString();
     }
   }
@@ -152,4 +229,5 @@ module.exports = {
   init,
   checkEvents,
   getRecentImpacts,
+  calculateStandardizedSurprise,
 };
