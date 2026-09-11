@@ -51,6 +51,32 @@ function updateSessionVWAP(price, volume, isBuy = true) {
 }
 
 /**
+ * Returns a complete, synchronized VWAP snapshot object.
+ * If live sessionVWAP is not yet calculated, gracefully initializes using benchmark typical price.
+ */
+function getVWAPSnapshot(fallbackPrice = 0, high = 0, low = 0, open = 0) {
+  let vwap = sessionVWAP;
+  if (!vwap || vwap <= 0) {
+    if (high && low && fallbackPrice) {
+      vwap = parseFloat(((high + low + fallbackPrice + (open || fallbackPrice)) / 4).toFixed(2));
+    } else if (fallbackPrice > 0) {
+      vwap = parseFloat(fallbackPrice.toFixed(2));
+    } else {
+      vwap = 0;
+    }
+  }
+  const dev = sessionVWAPDev || 2.5;
+  return {
+    vwap,
+    sessionVWAP: vwap,
+    sessionVWAPDev: dev,
+    vwapUpper: vwap > 0 ? parseFloat((vwap + dev).toFixed(2)) : 0,
+    vwapLower: vwap > 0 ? parseFloat((vwap - dev).toFixed(2)) : 0,
+    cvd: sessionCumDelta,
+  };
+}
+
+/**
  * Smart Money Technique (SMT) Divergence Detector: Gold vs Silver
  * Checks rolling 20-minute swing highs and lows
  * Bullish SMT: Gold makes Lower Low while Silver holds Higher Low (Institutional Absorption)
@@ -168,10 +194,52 @@ async function seedHistoricalPrices() {
       if (!priceHistory['GC=F']) priceHistory['GC=F'] = [];
       chart.quotes.forEach((q) => {
         if (q.close && q.date) {
-          priceHistory['GC=F'].push({ price: parseFloat(q.close.toFixed(2)), ts: new Date(q.date).getTime() });
+          const barClose = parseFloat(q.close.toFixed(2));
+          priceHistory['GC=F'].push({ price: barClose, ts: new Date(q.date).getTime() });
+          const isBuy = q.open ? barClose >= q.open : true;
+          updateSessionVWAP(barClose, q.volume || 10, isBuy);
         }
       });
-      console.log(`[PRICE] Seeded ${chart.quotes.length} historical 5m bars for GC=F`);
+      console.log(`[PRICE] Seeded ${chart.quotes.length} historical 5m bars for GC=F (Initial Session VWAP: $${sessionVWAP})`);
+
+      // Initialize baseline gold price object if not yet populated
+      const lastBar = chart.quotes[chart.quotes.length - 1];
+      if (lastBar && lastBar.close && (!latestPrices['GC=F'] || !latestPrices['GC=F'].price)) {
+        const p = parseFloat(lastBar.close.toFixed(2));
+        const high = lastBar.high ? parseFloat(lastBar.high.toFixed(2)) : p;
+        const low = lastBar.low ? parseFloat(lastBar.low.toFixed(2)) : p;
+        const open = lastBar.open ? parseFloat(lastBar.open.toFixed(2)) : p;
+        const vwapMetrics = getVWAPSnapshot(p, high, low, open);
+        const goldData = {
+          symbol: 'GC=F',
+          label: 'XAU/USD',
+          description: 'Spot Gold (OANDA:XAUUSD Initializing)',
+          unit: 'USD/oz',
+          correlation: 'primary',
+          price: p,
+          change5m: 0,
+          changeDay: 0,
+          changeAbs: 0,
+          bid: p,
+          ask: p,
+          high,
+          low,
+          open,
+          priceLocation: 0.5,
+          pivotP: p,
+          volume: lastBar.volume || 0,
+          direction: 'FLAT',
+          updatedAt: new Date().toISOString(),
+          latency: 'HISTORICAL_SEED',
+          source: 'HISTORICAL_SEED',
+          authoritativeSource: 'OANDA:XAUUSD (Primary)',
+          ...vwapMetrics,
+          smtDivergence: computeSMTDivergence(),
+          intervals: {},
+        };
+        latestPrices['GC=F'] = goldData;
+        latestPrices['XAUUSD'] = goldData;
+      }
     }
   } catch (_) {}
 }
@@ -344,6 +412,7 @@ class BinancePAXGStreamer {
       const change5mEntry = getChangeSince('GC=F', 5 * 60 * 1000, price, high, low);
       const change5m = change5mEntry.chp;
 
+      const vwapMetrics = getVWAPSnapshot(price, high, low, price);
       const goldData = {
         symbol: 'GC=F',
         label: 'XAU/USD',
@@ -367,6 +436,8 @@ class BinancePAXGStreamer {
         source: 'BINANCE_PAXG_STANDBY',
         isHotStandby: true,
         authoritativeSource: 'OANDA:XAUUSD (Standby Mode)',
+        ...vwapMetrics,
+        smtDivergence: computeSMTDivergence(),
         intervals: {
           '1': { ch: 0, chp: 0 },
           '5': { ch: parseFloat(((price * change5m) / 100).toFixed(2)), chp: parseFloat(change5m.toFixed(2)) },
@@ -517,6 +588,7 @@ class TVStreamer {
       // Update institutional true session VWAP & CVD
       const isAggressiveBuy = newPrice >= ask || (existing.price && newPrice >= existing.price);
       updateSessionVWAP(newPrice, v.volume || 1, isAggressiveBuy);
+      const vwapMetrics = getVWAPSnapshot(newPrice, high, low, open);
 
       // Compute Smart Money Technique (SMT) Divergence against Silver
       const smt = computeSMTDivergence();
@@ -544,10 +616,7 @@ class TVStreamer {
         latency: 'REALTIME_WEBSOCKET',
         source: 'OANDA:XAUUSD_STREAM',
         authoritativeSource: 'OANDA:XAUUSD (Primary)',
-        vwap: sessionVWAP,
-        vwapUpper: parseFloat((sessionVWAP + sessionVWAPDev).toFixed(2)),
-        vwapLower: parseFloat((sessionVWAP - sessionVWAPDev).toFixed(2)),
-        cvd: sessionCumDelta,
+        ...vwapMetrics,
         smtDivergence: smt,
         paxgLead: latestPaxgPrice > 0 ? {
           price: latestPaxgPrice,
@@ -857,6 +926,9 @@ async function fetchAllPrices() {
       const changeDayVal = liveGold.changeDay || (latestPrices['GC=F']?.changeDay || 0);
       const changeAbsVal = liveGold.changeAbs || 0;
 
+      updateSessionVWAP(goldPrice, liveGold.volume || 10, goldPrice >= (liveGold.open || goldPrice));
+      const vwapMetrics = getVWAPSnapshot(goldPrice, liveGold.high, liveGold.low, liveGold.open);
+
       const goldData = {
         symbol: 'GC=F',
         label: 'XAU/USD',
@@ -878,6 +950,8 @@ async function fetchAllPrices() {
         latency: 'REALTIME_HTTP',
         source: liveGold.source || 'HTTP_FALLBACK',
         authoritativeSource: 'OANDA:XAUUSD (Scanner Fallback)',
+        ...vwapMetrics,
+        smtDivergence: computeSMTDivergence(),
         intervals: {
           '1': prevIntervals['1'] || { ch: 0, chp: 0 },
           '5': prevIntervals['5'] || { ch: parseFloat(((goldPrice * change5m) / 100).toFixed(2)), chp: parseFloat(change5m.toFixed(2)) },

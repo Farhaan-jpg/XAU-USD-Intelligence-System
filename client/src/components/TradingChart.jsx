@@ -126,7 +126,7 @@ export default function TradingChart({ prices = {} }) {
 
         {/* Center: Clean Monospace Floor Pivots & Order Flow Ribbon */}
         <div className="chart-pivots-ribbon">
-          {gold.sessionVWAP > 0 && (
+          {(gold.sessionVWAP > 0 || gold.vwap > 0) && (
             <span
               className="pivot-tag"
               style={{
@@ -137,7 +137,7 @@ export default function TradingChart({ prices = {} }) {
               }}
               title="True Rolling Session VWAP (OANDA Order Flow)"
             >
-              VWAP ${(parseFloat(gold.sessionVWAP)).toFixed(2)}
+              VWAP ${(parseFloat(gold.sessionVWAP || gold.vwap)).toFixed(2)}
             </span>
           )}
           {gold.cvd !== undefined && gold.cvd !== 0 && (

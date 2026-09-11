@@ -55,7 +55,7 @@ export function calculateFearGreed({ prices = {}, newsFeed = [], calendarData = 
 
   // 3. Real-Time Intraday Momentum, Session VWAP & CVD Flow (20% weight)
   // Sub-second quantitative order flow: distance to true session VWAP, Cumulative Volume Delta, 1m/5m/15m multi-horizon velocity, and Gold/Silver beta
-  const sessionVWAP = parseFloat(gold.sessionVWAP || 0);
+  const sessionVWAP = parseFloat(gold.sessionVWAP || gold.vwap || 0);
   const vwapBenchmark = sessionVWAP > 0 ? sessionVWAP : ((goldHigh + goldLow + spotPrice + goldOpen) / 4);
   const vwapDist = vwapBenchmark > 0 ? ((spotPrice - vwapBenchmark) / vwapBenchmark) * 100 : 0;
   const vwapPoints = Math.max(-25, Math.min(25, vwapDist * 50));
@@ -315,7 +315,7 @@ export function analyzeTraderPsychology({ prices = {}, newsFeed = [], calendarDa
 
   // SMT Divergence & True Session VWAP/CVD
   const smt = gold.smtDivergence || {};
-  const sessionVWAP = parseFloat(gold.sessionVWAP || 0);
+  const sessionVWAP = parseFloat(gold.sessionVWAP || gold.vwap || 0);
   const cvd = parseFloat(gold.cvd || 0);
   const goldChg1h = parseFloat(gold.intervals?.['60']?.chp ?? (goldChg5m * 1.5));
 

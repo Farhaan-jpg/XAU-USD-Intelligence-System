@@ -120,7 +120,7 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
 
     // 4. Real-Time Intraday Momentum, True Session VWAP, CVD & SMT Vector (18% weight)
     // Sub-second quantitative order flow: distance to true session VWAP, Cumulative Volume Delta, SMT divergence, and Silver beta
-    const sessionVWAP = parseFloat(gold.sessionVWAP || 0);
+    const sessionVWAP = parseFloat(gold.sessionVWAP || gold.vwap || 0);
     const vwapBenchmark = sessionVWAP > 0 ? sessionVWAP : ((goldHigh + goldLow + spotPrice + goldOpen) / 4);
     const vwapDist = vwapBenchmark > 0 ? ((spotPrice - vwapBenchmark) / vwapBenchmark) * 100 : 0;
     const vwapPoints = Math.max(-25, Math.min(25, vwapDist * 55));

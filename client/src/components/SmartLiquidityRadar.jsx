@@ -83,8 +83,16 @@ export default function SmartLiquidityRadar({ prices = {} }) {
     }
   }, [spotPrice, smcLevels.bslMajor, smcLevels.sslMajor]);
 
-  const sessionVWAP = parseFloat(gold.sessionVWAP || 0);
-  const sessionDev = parseFloat(gold.sessionVWAPDev || 3.5);
+  const rawVwap = parseFloat(gold.sessionVWAP || gold.vwap || 0);
+  const rawDev = parseFloat(gold.sessionVWAPDev || 3.5);
+  // Benchmark fallback from high, low, close, open if VWAP has not ticked yet
+  const benchmarkVWAP = spotPrice > 0 ? (
+    gold.high && gold.low && gold.open
+      ? parseFloat(((parseFloat(gold.high) + parseFloat(gold.low) + spotPrice + parseFloat(gold.open)) / 4).toFixed(2))
+      : spotPrice
+  ) : 0;
+  const sessionVWAP = rawVwap > 0 ? rawVwap : benchmarkVWAP;
+  const sessionDev = rawDev > 0 ? rawDev : 3.5;
   const vwapUpper = sessionVWAP > 0 ? (sessionVWAP + sessionDev).toFixed(2) : '--';
   const vwapLower = sessionVWAP > 0 ? (sessionVWAP - sessionDev).toFixed(2) : '--';
   const vwapDiff = sessionVWAP > 0 && spotPrice > 0 ? spotPrice - sessionVWAP : 0;
