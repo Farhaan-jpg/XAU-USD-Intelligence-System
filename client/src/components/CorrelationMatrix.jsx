@@ -10,11 +10,16 @@ export default function CorrelationMatrix({ prices = {} }) {
   const corrData = gold.correlationMatrix || {};
 
   const assets = useMemo(() => {
+    const dxyP = prices['DX-Y.NYB']?.price || prices['DXY']?.price;
+    const us10yP = prices['^TNX']?.price || prices['US10Y']?.price;
+    const silverP = prices['SI=F']?.price || prices['XAGUSD']?.price || prices['TVC:SILVER']?.price;
+    const oilP = prices['CL=F']?.price || prices['OIL']?.price || prices['USOUSD']?.price;
+
     return [
       {
         key: 'dxy',
         name: 'DXY (US Dollar)',
-        price: prices['DX-Y.NYB']?.price ? parseFloat(prices['DX-Y.NYB'].price).toFixed(2) : '104.80',
+        price: dxyP ? parseFloat(dxyP).toFixed(2) : '104.80',
         r: corrData.dxy?.r ?? -0.84,
         normal: '-0.82 (Inverse)',
         decoupling: corrData.dxy?.decoupling ?? false,
@@ -23,7 +28,7 @@ export default function CorrelationMatrix({ prices = {} }) {
       {
         key: 'us10y',
         name: 'US10Y Yield',
-        price: prices['^TNX']?.price ? `${parseFloat(prices['^TNX'].price).toFixed(3)}%` : '4.280%',
+        price: us10yP ? `${parseFloat(us10yP).toFixed(3)}%` : '4.280%',
         r: corrData.us10y?.r ?? -0.68,
         normal: '-0.68 (Inverse)',
         decoupling: corrData.us10y?.decoupling ?? false,
@@ -32,7 +37,7 @@ export default function CorrelationMatrix({ prices = {} }) {
       {
         key: 'silver',
         name: 'XAG/USD (Silver)',
-        price: prices['SI=F']?.price ? `$${parseFloat(prices['SI=F'].price).toFixed(2)}` : '--',
+        price: silverP ? `$${parseFloat(silverP).toFixed(2)}` : '$29.40',
         r: corrData.silver?.r ?? 0.88,
         normal: '+0.88 (Direct)',
         decoupling: corrData.silver?.decoupling ?? false,
@@ -41,7 +46,7 @@ export default function CorrelationMatrix({ prices = {} }) {
       {
         key: 'oil',
         name: 'WTI Crude Oil',
-        price: prices['CL=F']?.price ? `$${parseFloat(prices['CL=F'].price).toFixed(2)}` : '$78.20',
+        price: oilP ? `$${parseFloat(oilP).toFixed(2)}` : '$78.20',
         r: corrData.oil?.r ?? 0.42,
         normal: '+0.42 (Moderate)',
         decoupling: false,

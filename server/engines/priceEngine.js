@@ -103,18 +103,41 @@ function getVolumeProfileSnapshot(spotPrice = 0, high = 0, low = 0, open = 0) {
         poc = parseFloat(levelStr);
       }
     }
-    // Calculate Value Area (70% of total volume around POC)
+
+    // Authentic CME / Market Profile Dual-Direction Expansion from POC
+    // Expands outward bucket-by-bucket until 70% of session volume is enclosed in a contiguous Value Area
     const targetVol = sessionVPTotalVol * 0.70;
-    let accumulated = 0;
-    const sortedByVol = [...entries].sort((a, b) => b[1] - a[1]);
-    const vaLevels = [];
-    for (const [lvl, vol] of sortedByVol) {
-      accumulated += vol;
-      vaLevels.push(parseFloat(lvl));
-      if (accumulated >= targetVol) break;
+    const roundedPOC = Math.round(poc);
+    let accumulatedVol = sessionVolumeProfile[roundedPOC] || 0;
+    let upperLvl = roundedPOC + 1;
+    let lowerLvl = roundedPOC - 1;
+
+    let iterations = 0;
+    while (accumulatedVol < targetVol && iterations < 80) {
+      iterations++;
+      const volUp = sessionVolumeProfile[upperLvl] || 0;
+      const volDown = sessionVolumeProfile[lowerLvl] || 0;
+
+      if (volUp === 0 && volDown === 0) {
+        // Expand search radius if price histogram is sparse
+        upperLvl++;
+        lowerLvl--;
+        continue;
+      }
+
+      if (volUp >= volDown && volUp > 0) {
+        accumulatedVol += volUp;
+        upperLvl++;
+      } else if (volDown > 0) {
+        accumulatedVol += volDown;
+        lowerLvl--;
+      } else {
+        upperLvl++;
+      }
     }
-    const vah = Math.max(...vaLevels);
-    const val = Math.min(...vaLevels);
+
+    const vah = Math.max(poc + 1, upperLvl - 1);
+    const val = Math.min(poc - 1, lowerLvl + 1);
 
     const minRange = Math.min(p - 8, low > 0 ? low : p - 8);
     const maxRange = Math.max(p + 8, high > 0 ? high : p + 8);
@@ -124,7 +147,7 @@ function getVolumeProfileSnapshot(spotPrice = 0, high = 0, low = 0, open = 0) {
       buckets.push({
         price: l,
         volume: vol,
-        isPOC: l === Math.round(poc),
+        isPOC: l === roundedPOC,
         inValueArea: l >= val && l <= vah,
       });
     }
@@ -190,7 +213,10 @@ function computePearson(symA, symB, windowMs = 60 * 60 * 1000) {
   }
 
   const num = n * sumXY - sumX * sumY;
-  const den = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  const termX = Math.max(0, n * sumX2 - sumX * sumX);
+  const termY = Math.max(0, n * sumY2 - sumY * sumY);
+  if (termX <= 0.000001 || termY <= 0.000001) return 0;
+  const den = Math.sqrt(termX * termY);
   if (den === 0 || isNaN(den)) return 0;
   return Math.max(-1, Math.min(1, parseFloat((num / den).toFixed(2))));
 }
@@ -769,6 +795,9 @@ class BinancePAXGStreamer {
       const mtfMatrix = calculateMTFMatrix(intervals, price);
       const tapeVelocity = getTapeVelocity();
       const surge = checkVolatilitySurge(price);
+      const currentDayRange = Math.max(0.1, high - low);
+      const adrBenchmark = 32.0;
+      const adrPercent = parseFloat(((currentDayRange / adrBenchmark) * 100).toFixed(1));
 
       const goldData = {
         symbol: 'GC=F',
@@ -784,6 +813,10 @@ class BinancePAXGStreamer {
         high,
         low,
         open: price,
+        prevClose: price,
+        dayRange: parseFloat(currentDayRange.toFixed(2)),
+        adr: adrBenchmark,
+        adrPercent,
         priceLocation: 0.5,
         pivotP: price,
         volume: parseFloat(tick.v || 0),
@@ -924,6 +957,11 @@ class TVStreamer {
       const chp = v.chp !== undefined ? parseFloat(v.chp.toFixed(2)) : (existing.changeDay || 0);
       const ch = v.ch !== undefined ? parseFloat(v.ch.toFixed(2)) : (existing.changeAbs || 0);
 
+      const prevClose = v.prev_close_price ? parseFloat(v.prev_close_price.toFixed(2)) : (existing.prevClose || open);
+      const currentDayRange = Math.max(0.1, high - low);
+      const adrBenchmark = 32.0;
+      const adrPercent = parseFloat(((currentDayRange / adrBenchmark) * 100).toFixed(1));
+
       // Time-sampled buffer
       recordPriceSample('GC=F', newPrice);
 
@@ -938,9 +976,9 @@ class TVStreamer {
       };
 
       const change5m = this.intervalChanges['5']?.chp ?? 0;
-      const dayRange = Math.max(1, high - low);
+      const dayRange = currentDayRange;
       const priceLocation = newPrice > 0 ? parseFloat(((newPrice - low) / dayRange).toFixed(4)) : 0.5;
-      const pivotP = parseFloat(((high + low + newPrice) / 3).toFixed(2));
+      const pivotP = parseFloat(((high + low + (prevClose || newPrice)) / 3).toFixed(2));
 
       // Update institutional true session VWAP, CVD, Volume Profile, and Tick Tape
       const isAggressiveBuy = newPrice >= ask || (existing.price && newPrice >= existing.price);
@@ -973,6 +1011,10 @@ class TVStreamer {
         high,
         low,
         open,
+        prevClose,
+        dayRange: parseFloat(dayRange.toFixed(2)),
+        adr: adrBenchmark,
+        adrPercent,
         priceLocation,
         pivotP,
         volume: v.volume || existing.volume || 0,

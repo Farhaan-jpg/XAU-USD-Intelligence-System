@@ -8,10 +8,11 @@ import { Clock, Crosshair, AlertCircle, ShieldCheck } from 'lucide-react';
 const KILLZONES = [
   { id: 'ASIA', name: 'Asian Range Accumulation', startUtc: 0, endUtc: 7, color: 'var(--cyan-primary)', desc: 'Initial liquidity bounds established' },
   { id: 'LONDON_JUDAS', name: 'London Open Judas Swing', startUtc: 7, endUtc: 9, color: 'var(--bear-primary)', desc: 'Fakeout expansion & stop run on Asian range' },
-  { id: 'LONDON_LUNCH', name: 'London Lunch / Equilibrium', startUtc: 10, endUtc: 12, color: 'var(--text-dim)', desc: 'Midday consolidation & mean reversion' },
-  { id: 'NY_OPEN', name: 'NY Open & Equities Bell', startUtc: 12, endUtc: 15, color: 'var(--gold-primary)', desc: 'Peak daily institutional volume & trend continuation' },
-  { id: 'LONDON_CLOSE', name: 'London Fixing & Close', startUtc: 15, endUtc: 16.5, color: 'var(--purple-primary)', desc: 'European profit taking & counter-trend pullbacks' },
-  { id: 'PRE_ASIA', name: 'Late NY / Pre-Asian Drift', startUtc: 17, endUtc: 24, color: 'var(--text-dim)', desc: 'Low liquidity range drift' },
+  { id: 'LONDON_EXPANSION', name: 'London Expansion & Lunch', startUtc: 9, endUtc: 12, color: 'var(--cyan-primary)', desc: 'Institutional trend continuation & equilibrium' },
+  { id: 'NY_OPEN', name: 'NY Open & Equities Bell', startUtc: 12, endUtc: 15, color: 'var(--gold-primary)', desc: 'Peak daily institutional volume & London overlap' },
+  { id: 'LONDON_CLOSE', name: 'London Fixing & Close', startUtc: 15, endUtc: 17, color: 'var(--purple-primary)', desc: 'European profit taking & benchmark fixing flows' },
+  { id: 'NY_PM', name: 'New York PM & Cash Close', startUtc: 17, endUtc: 21, color: 'var(--gold-primary)', desc: 'US afternoon trend continuation & settlement' },
+  { id: 'PRE_ASIA', name: 'Late NY / Pre-Asian Drift', startUtc: 21, endUtc: 24, color: 'var(--text-dim)', desc: 'Low liquidity range drift into Asia open' },
 ];
 
 export default function KillzoneTracker({ prices = {} }) {

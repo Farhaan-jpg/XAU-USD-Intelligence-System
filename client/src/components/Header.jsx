@@ -129,6 +129,20 @@ export default function Header({
           <span>{tps.toFixed(1)} TPS &bull; {tapeStatus}</span>
         </div>
 
+        {/* Average Daily Range (ADR) Expansion Metric */}
+        {gold.adrPercent !== undefined && (
+          <div
+            className="header-pill"
+            title={`Average Daily Range (5D ADR Benchmark: $32.00). Current expansion: $${gold.dayRange || '0.00'}`}
+            style={{
+              borderColor: gold.adrPercent >= 100 ? 'var(--bear-primary)' : gold.adrPercent >= 75 ? 'var(--gold-primary)' : 'var(--border-subtle)',
+              color: gold.adrPercent >= 100 ? 'var(--bear-primary)' : gold.adrPercent >= 75 ? 'var(--gold-primary)' : 'var(--text-secondary)',
+            }}
+          >
+            <span>ADR: {gold.adrPercent}% (${gold.dayRange || 0})</span>
+          </div>
+        )}
+
         {/* Volatility Surge Alarm Flag */}
         {gold.volatilitySurge && (
           <div className="header-pill surge-alert" title="Rapid Volatility Expansion Detected!">

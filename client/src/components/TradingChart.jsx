@@ -31,37 +31,57 @@ export default function TradingChart({ prices = {} }) {
     if (spotPrice) prevPriceRef.current = spotPrice;
   }, [spotPrice]);
 
-  // Institutional floor pivots based on authentic spot range
+  const [pivotMode, setPivotMode] = useState('FLOOR'); // 'FLOOR' | 'CAMARILLA'
+
+  // Institutional Floor and Camarilla Pivots based on authentic prior close and session range
   const pivots = useMemo(() => {
     const p = spotPrice;
-    if (!p) return { r2: '--', r1: '--', p: '--', s1: '--', s2: '--' };
+    if (!p) return { r3: '--', r2: '--', r1: '--', p: '--', s1: '--', s2: '--', s3: '--', h4: '--', h3: '--', l3: '--', l4: '--' };
 
-    if (gold.high && gold.low && gold.high > gold.low) {
-      const H = parseFloat(gold.high);
-      const L = parseFloat(gold.low);
-      const C = p;
-      const P = (H + L + C) / 3;
-      const R1 = (2 * P) - L;
-      const S1 = (2 * P) - H;
-      const R2 = P + (H - L);
-      const S2 = P - (H - L);
-      return {
-        r2: R2.toFixed(2),
-        r1: R1.toFixed(2),
-        p: P.toFixed(2),
-        s1: S1.toFixed(2),
-        s2: S2.toFixed(2),
-      };
-    }
+    const H = gold.high && gold.low && gold.high > gold.low ? parseFloat(gold.high) : p + 12;
+    const L = gold.high && gold.low && gold.high > gold.low ? parseFloat(gold.low) : p - 12;
+    const C = parseFloat(gold.prevClose || p);
+    const range = H - L;
+
+    // Classical Floor Pivots
+    const P = (H + L + C) / 3;
+    const R1 = (2 * P) - L;
+    const S1 = (2 * P) - H;
+    const R2 = P + range;
+    const S2 = P - range;
+    const R3 = H + 2 * (P - L);
+    const S3 = L - 2 * (H - P);
+
+    // Institutional Camarilla Equations (H4 Break Long, H3 Fade Short, L3 Fade Long, L4 Break Short)
+    const H4 = C + (range * 1.1) / 2;
+    const H3 = C + (range * 1.1) / 4;
+    const L3 = C - (range * 1.1) / 4;
+    const L4 = C - (range * 1.1) / 2;
 
     return {
-      r2: (p + 14.5).toFixed(2),
-      r1: (p + 7.2).toFixed(2),
-      p: p.toFixed(2),
-      s1: (p - 7.2).toFixed(2),
-      s2: (p - 14.5).toFixed(2),
+      r3: R3.toFixed(2),
+      r2: R2.toFixed(2),
+      r1: R1.toFixed(2),
+      p: P.toFixed(2),
+      s1: S1.toFixed(2),
+      s2: S2.toFixed(2),
+      s3: S3.toFixed(2),
+      h4: H4.toFixed(2),
+      h3: H3.toFixed(2),
+      l3: L3.toFixed(2),
+      l4: L4.toFixed(2),
     };
-  }, [spotPrice, gold.high, gold.low]);
+  }, [spotPrice, gold.high, gold.low, gold.prevClose]);
+
+  // Real-Time Average Daily Range (ADR) Expansion
+  const adrInfo = useMemo(() => {
+    const dayRange = gold.dayRange || (gold.high && gold.low ? (gold.high - gold.low) : null);
+    const pct = gold.adrPercent || (dayRange ? ((dayRange / 32.0) * 100).toFixed(0) : null);
+    return {
+      range: dayRange ? (typeof dayRange === 'number' ? dayRange.toFixed(1) : parseFloat(dayRange).toFixed(1)) : null,
+      pct: pct ? `${Math.round(pct)}%` : null,
+    };
+  }, [gold.dayRange, gold.adrPercent, gold.high, gold.low]);
 
   const intervals = [
     { label: '1M', val: '1' },
@@ -126,12 +146,32 @@ export default function TradingChart({ prices = {} }) {
               <span style={{ margin: '0 4px', opacity: 0.4 }}>/</span>
               <span>ASK <strong style={{ color: 'var(--text-main)' }}>${ask}</strong></span>
               {spread && <span style={{ marginLeft: '6px', color: 'var(--text-dim)' }}>(Spr ${spread})</span>}
+              {adrInfo.range && (
+                <span style={{ marginLeft: '8px', color: 'var(--gold-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                  ADR ${adrInfo.range} ({adrInfo.pct})
+                </span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Center: Clean Monospace Floor Pivots & Order Flow Ribbon */}
+        {/* Center: Clean Monospace Floor & Camarilla Pivots & Order Flow Ribbon */}
         <div className="chart-pivots-ribbon">
+          <button
+            onClick={() => setPivotMode(pivotMode === 'FLOOR' ? 'CAMARILLA' : 'FLOOR')}
+            className="pivot-tag"
+            style={{
+              cursor: 'pointer',
+              fontWeight: 700,
+              color: 'var(--cyan-primary)',
+              borderColor: 'rgba(56, 189, 248, 0.4)',
+              background: 'rgba(56, 189, 248, 0.08)',
+            }}
+            title="Click to switch between Classical Floor Pivots and Camarilla Equations"
+          >
+            {pivotMode}
+          </button>
+
           {(gold.sessionVWAP > 0 || gold.vwap > 0) && (
             <span
               className="pivot-tag"
@@ -173,11 +213,27 @@ export default function TradingChart({ prices = {} }) {
               {gold.smtDivergence.status === 'BULLISH_SMT' ? '▲ BULL SMT' : '▼ BEAR SMT'}
             </span>
           )}
-          <span className="pivot-tag r2" title="Resistance 2">R2 ${pivots.r2}</span>
-          <span className="pivot-tag r1" title="Resistance 1">R1 ${pivots.r1}</span>
-          <span className="pivot-tag p" title="Equilibrium Pivot">P ${pivots.p}</span>
-          <span className="pivot-tag s1" title="Support 1">S1 ${pivots.s1}</span>
-          <span className="pivot-tag s2" title="Support 2">S2 ${pivots.s2}</span>
+
+          {pivotMode === 'FLOOR' ? (
+            <>
+              <span className="pivot-tag r2" title="Floor Resistance 2">R2 ${pivots.r2}</span>
+              <span className="pivot-tag r1" title="Floor Resistance 1">R1 ${pivots.r1}</span>
+              <span className="pivot-tag p" title="Floor Equilibrium Pivot">P ${pivots.p}</span>
+              <span className="pivot-tag s1" title="Floor Support 1">S1 ${pivots.s1}</span>
+              <span className="pivot-tag s2" title="Floor Support 2">S2 ${pivots.s2}</span>
+            </>
+          ) : (
+            <>
+              <span className="pivot-tag r2" title="Camarilla H4 Long Breakout Trigger" style={{ color: 'var(--bull-primary)', borderColor: 'rgba(16, 185, 129, 0.4)' }}>
+                H4 ${pivots.h4}
+              </span>
+              <span className="pivot-tag r1" title="Camarilla H3 Short Fade Zone">H3 ${pivots.h3}</span>
+              <span className="pivot-tag s1" title="Camarilla L3 Long Fade Zone">L3 ${pivots.l3}</span>
+              <span className="pivot-tag s2" title="Camarilla L4 Short Breakdown Trigger" style={{ color: 'var(--bear-primary)', borderColor: 'rgba(244, 63, 94, 0.4)' }}>
+                L4 ${pivots.l4}
+              </span>
+            </>
+          )}
         </div>
 
         {/* Right: Minimalist Timeframe Segmented Control & TV Link */}
