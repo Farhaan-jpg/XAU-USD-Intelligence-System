@@ -6,8 +6,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from './hooks/useSocket';
 import Header from './components/Header';
 import TradingChart from './components/TradingChart';
-import KillzoneTracker from './components/KillzoneTracker';
-import CorrelationMatrix from './components/CorrelationMatrix';
 import ConfluenceMeter from './components/ConfluenceMeter';
 import MacroRadar from './components/MacroRadar';
 import AIMarketGuidance from './components/AIMarketGuidance';
@@ -19,11 +17,7 @@ import TelemetryModal from './components/TelemetryModal';
 import SoundboardModal from './components/SoundboardModal';
 import StatusBar from './components/StatusBar';
 import SmartLiquidityRadar from './components/SmartLiquidityRadar';
-import VolatilityTrapDetector from './components/VolatilityTrapDetector';
-import COTSentimentGauge from './components/COTSentimentGauge';
 import PriceAlerts from './components/PriceAlerts';
-import AsianRangeBox from './components/AsianRangeBox';
-import FearGreedGauge from './components/FearGreedGauge';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import MobileTraderDock from './components/MobileTraderDock';
 import { speakSquawk, toggleAudioMute, playChime } from './utils/audioAlerts';
@@ -298,26 +292,9 @@ XAU/USD Intelligence System`;
           </div>
         </div>
 
-        {/* ── ROW C: Session Microstructure, Traps & Correlation Matrix ─ */}
-        <div className="apex-grid-micro">
-          <AsianRangeBox prices={prices} />
-          <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
-          <KillzoneTracker prices={prices} />
-          <CorrelationMatrix prices={prices} />
-        </div>
-
-        {/* ── ROW D: Bottom 3-col — Calendar · Sentiment Stack · News Wire ─ */}
+        {/* ── ROW C: Macro Deck — Economic Calendar & Real-Time News Wire ─ */}
         <div className="apex-grid-bottom">
           <EconomicCalendar calendarData={calendarData} />
-          <div className="sentiment-stack">
-            <FearGreedGauge
-              prices={prices}
-              newsFeed={newsFeed}
-              calendarData={calendarData}
-              cotData={cotData}
-            />
-            <COTSentimentGauge cotData={cotData} />
-          </div>
           <NewsTerminal newsFeed={newsFeed} />
         </div>
 

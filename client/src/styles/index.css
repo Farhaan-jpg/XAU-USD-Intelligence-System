@@ -476,33 +476,14 @@ input, select, textarea { font-family: var(--font-sans); }
   gap: 8px;
 }
 
-/* ─── Session Microstructure & Traps 2x2 Grid ─────────────────────────── */
-.apex-grid-micro {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-/* ─── 4-col analytics row ─────────────────────────────────────────────── */
-.apex-grid-analytics {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-/* ─── 3-col bottom row: Calendar · Sentiment · News Wire ───────────────── */
+/* ─── 2-col bottom row: Calendar & News Wire ──────────────────────────── */
 .apex-grid-bottom {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1.2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   align-items: start;
 }
 
-.sentiment-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 
 /* Legacy grid aliases */
 .grid-terminal-top    { display: grid; grid-template-columns: 1fr 380px; gap: 8px; }
