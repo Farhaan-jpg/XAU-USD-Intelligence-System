@@ -2,7 +2,7 @@
 // ICT Institutional Session Killzones & London Open Judas Swing Tracker
 // Displays active session, countdown to next killzone, and smart money Judas trap status
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo} from 'react';
 import { Clock, Crosshair, AlertCircle, ShieldCheck } from 'lucide-react';
 
 const KILLZONES = [
@@ -15,7 +15,7 @@ const KILLZONES = [
   { id: 'PRE_ASIA', name: 'Late NY / Pre-Asian Drift', startUtc: 21, endUtc: 24, color: 'var(--text-dim)', desc: 'Low liquidity range drift into Asia open' },
 ];
 
-export default function KillzoneTracker({ prices = {} }) {
+function KillzoneTracker({ prices = {} }) {
   const [utcTime, setUtcTime] = useState(new Date());
 
   useEffect(() => {
@@ -122,3 +122,5 @@ export default function KillzoneTracker({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(KillzoneTracker);

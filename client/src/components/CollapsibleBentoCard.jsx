@@ -2,10 +2,10 @@
 // Institutional Bento-Box Progressive Disclosure Card
 // Expands to reveal deep data; collapses to a clean single-row summary to maximize negative space
 
-import { useState } from 'react';
+import { useState, memo} from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
-export default function CollapsibleBentoCard({
+function CollapsibleBentoCard({
   id,
   title,
   icon: Icon,
@@ -69,3 +69,5 @@ export default function CollapsibleBentoCard({
     </div>
   );
 }
+
+export default memo(CollapsibleBentoCard);

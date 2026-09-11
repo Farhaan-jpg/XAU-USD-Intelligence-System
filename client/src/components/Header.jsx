@@ -1,7 +1,7 @@
 // client/src/components/Header.jsx
 // Institutional Real-Time Executive Header Bar with Live Telemetry, Tape Speed, Killzone & Quick Modals
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo} from 'react';
 import {
   Volume2,
   VolumeX,
@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { isMuted, toggleAudioMute } from '../utils/audioAlerts';
 
-export default function Header({
+function Header({
   connected = false,
   latency = null,
   prices = {},
@@ -278,3 +278,5 @@ export default function Header({
     </header>
   );
 }
+
+export default memo(Header);

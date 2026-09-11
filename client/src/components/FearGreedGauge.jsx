@@ -2,11 +2,11 @@
 // Institutional Gold Safe-Haven Fear & Greed Index (0 - 100)
 // Fully dynamic multi-factor quantitative engine deriving real-time market sentiment
 
-import { useMemo } from 'react';
+import { useMemo, memo} from 'react';
 import { Gauge } from 'lucide-react';
 import { calculateFearGreed } from '../utils/sentimentEngine';
 
-export default function FearGreedGauge({ prices = {}, newsFeed = [], calendarData = {}, cotData = {} }) {
+function FearGreedGauge({ prices = {}, newsFeed = [], calendarData = {}, cotData = {} }) {
   const { score, label, color, components } = useMemo(() => {
     return calculateFearGreed({ prices, newsFeed, calendarData, cotData });
   }, [prices, newsFeed, calendarData, cotData]);
@@ -130,3 +130,5 @@ export default function FearGreedGauge({ prices = {}, newsFeed = [], calendarDat
     </div>
   );
 }
+
+export default memo(FearGreedGauge);

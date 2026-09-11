@@ -1,13 +1,13 @@
 // client/src/components/TradingChart.jsx
 // Professional High-Density TradingView Workstation with Compact Single-Row Price & Pivot Ticker
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, memo} from 'react';
 import { ExternalLink, BarChart2, Activity, Layers } from 'lucide-react';
 import TickTape from './TickTape';
 import MTFMatrix from './MTFMatrix';
 import VolumeProfileOverlay from './VolumeProfileOverlay';
 
-export default function TradingChart({ prices = {} }) {
+function TradingChart({ prices = {} }) {
   const [interval, setInterval] = useState('5'); // '1', '5', '15', '60', '240', 'D'
   const [showTape, setShowTape] = useState(true);
   const [showMTF, setShowMTF] = useState(true);
@@ -317,3 +317,5 @@ export default function TradingChart({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(TradingChart);

@@ -2,10 +2,10 @@
 // Multi-Timeframe (MTF) Trend & Momentum Alignment Matrix (1M, 5M, 15M, 1H, 4H, 1D)
 // Instant institutional confluence check across all market time horizons
 
-import { useMemo } from 'react';
+import { useMemo, memo} from 'react';
 import { Layers, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 
-export default function MTFMatrix({ prices = {} }) {
+function MTFMatrix({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const intervals = gold.intervals || {};
 
@@ -121,3 +121,5 @@ export default function MTFMatrix({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(MTFMatrix);

@@ -2,9 +2,9 @@
 // Mobile-Responsive Swipeable Horizontal Carousel for Side-by-Side Analytics
 // Converts desktop multi-column cards into a smooth swipeable carousel on mobile with pagination dots
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo} from 'react';
 
-export default function MobileAnalyticsCarousel({ children, className = '' }) {
+function MobileAnalyticsCarousel({ children, className = '' }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const trackRef = useRef(null);
   const items = Array.isArray(children) ? children.filter(Boolean) : [children];
@@ -60,3 +60,5 @@ export default function MobileAnalyticsCarousel({ children, className = '' }) {
     </div>
   );
 }
+
+export default memo(MobileAnalyticsCarousel);

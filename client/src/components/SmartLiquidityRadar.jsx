@@ -1,11 +1,11 @@
 // client/src/components/SmartLiquidityRadar.jsx
 // Institutional Smart Money Concepts (SMC) & Liquidity Radar (BSL / SSL / FVG / OB)
 
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, memo} from 'react';
 import { Target } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
-export default function SmartLiquidityRadar({ prices = {} }) {
+function SmartLiquidityRadar({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
 
@@ -285,3 +285,5 @@ export default function SmartLiquidityRadar({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(SmartLiquidityRadar);

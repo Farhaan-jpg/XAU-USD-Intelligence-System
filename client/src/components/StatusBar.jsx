@@ -1,7 +1,7 @@
 // client/src/components/StatusBar.jsx
 // Institutional Streaming Ticker & System Health Status Bar (Bloomberg Terminal Style)
 
-export default function StatusBar({ connected = false, prices = {}, newsFeed = [], aiTelemetry = {} }) {
+function StatusBar({ connected = false, prices = {}, newsFeed = [], aiTelemetry = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const silver = prices['SI=F'] || prices['XAGUSD'] || {};
   const dxy = prices['DX-Y.NYB'] || {};
@@ -61,3 +61,5 @@ export default function StatusBar({ connected = false, prices = {}, newsFeed = [
     </footer>
   );
 }
+
+export default memo(StatusBar);

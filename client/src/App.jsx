@@ -2,7 +2,7 @@
 // Institutional Gold (XAU/USD) Real-Time Unified Intelligence Workstation v3.0
 // Bloomberg / TradingView Pro Level Single-Screen Command Center
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSocket } from './hooks/useSocket';
 import Header from './components/Header';
 import TradingChart from './components/TradingChart';
@@ -55,15 +55,15 @@ export default function App() {
   const [aiTelemetry, setAiTelemetry] = useState({});
   const [alertsCount, setAlertsCount] = useState(0);
 
-  // Compute active trading session from UTC hour
-  const activeSession = (() => {
+  // Compute active trading session from UTC hour (memoized — updates every minute only)
+  const activeSession = useMemo(() => {
     const h = new Date().getUTCHours();
-    if (h >= 0 && h < 7) return 'Asian Session';
+    if (h >= 0 && h < 7)  return 'Asian Session';
     if (h >= 7 && h < 12) return 'London Session';
     if (h >= 12 && h < 17) return 'London/NY Overlap';
     if (h >= 17 && h < 21) return 'New York Session';
     return 'Late NY / Pre-Asian';
-  })();
+  }, [new Date().getUTCHours()]);
 
   // Poll AI Telemetry
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function App() {
 
   useEffect(() => {
     updateAlertsCount();
-    const timer = setInterval(updateAlertsCount, 3000);
+    const timer = setInterval(updateAlertsCount, 5000);
     return () => clearInterval(timer);
   }, [updateAlertsCount]);
 

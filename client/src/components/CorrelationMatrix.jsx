@@ -2,10 +2,10 @@
 // Institutional Live Rolling Pearson Correlation Coefficient (r) Matrix
 // Real-time tracking of Gold vs DXY, US10Y, Silver, and Oil with Decoupling Anomaly Alerts
 
-import { useMemo } from 'react';
+import { useMemo, memo} from 'react';
 import { Radar, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 
-export default function CorrelationMatrix({ prices = {} }) {
+function CorrelationMatrix({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const corrData = gold.correlationMatrix || {};
 
@@ -141,3 +141,5 @@ export default function CorrelationMatrix({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(CorrelationMatrix);

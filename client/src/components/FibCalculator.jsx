@@ -1,10 +1,10 @@
 // client/src/components/FibCalculator.jsx
 // Institutional Smart Money Concepts (SMC) & Fibonacci Retracement / Extension Calculator
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo} from 'react';
 import { Layers, ArrowDownUp, Sparkles, Target } from 'lucide-react';
 
-export default function FibCalculator({ prices = {} }) {
+function FibCalculator({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
   const liveHigh = parseFloat(gold.high || 0);
@@ -262,3 +262,5 @@ export default function FibCalculator({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(FibCalculator);

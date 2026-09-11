@@ -1,10 +1,10 @@
 // client/src/components/AsianRangeBox.jsx
 // Institutional Asian Range (00:00 - 07:00 UTC) Box Tracker & London/NY Expansion Raid Targets
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo} from 'react';
 import { Box, ArrowUpRight, ArrowDownRight, Compass, ShieldAlert, CheckCircle } from 'lucide-react';
 
-export default function AsianRangeBox({ prices = {} }) {
+function AsianRangeBox({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
 
@@ -366,3 +366,5 @@ export default function AsianRangeBox({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(AsianRangeBox);

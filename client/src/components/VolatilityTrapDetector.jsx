@@ -1,11 +1,11 @@
 // client/src/components/VolatilityTrapDetector.jsx
 // Post-News "Volatility Expansion" Reversal & Mean Reversion Detector with Ambient Border
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo} from 'react';
 import { Flame, ShieldAlert, Activity } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
-export default function VolatilityTrapDetector({ prices = {} }) {
+function VolatilityTrapDetector({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const currentPrice = parseFloat(gold.price || 0);
 
@@ -117,3 +117,5 @@ export default function VolatilityTrapDetector({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(VolatilityTrapDetector);

@@ -1,11 +1,11 @@
 // client/src/components/MacroRadar.jsx
 // Institutional 8-Asset Intermarket Correlation Matrix Ribbon with Divergence Engine
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, memo} from 'react';
 import { Radar, ArrowUpRight, ArrowDownRight, AlertTriangle } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
-export default function MacroRadar({ prices = {} }) {
+function MacroRadar({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const silver = prices['SI=F'] || prices['XAGUSD'] || {};
   const dxy = prices['DX-Y.NYB'] || {};
@@ -232,3 +232,5 @@ export default function MacroRadar({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(MacroRadar);

@@ -2,11 +2,11 @@
 // Sticky Bottom Execution Dock for Mobile Trader View
 // Provides frozen 48px touch-target SELL/BUY actions with live bid/ask and lot sizing
 
-import { useState } from 'react';
+import { useState, memo} from 'react';
 import { TrendingUp, TrendingDown, Check, Zap } from 'lucide-react';
 import { playChime } from '../utils/audioAlerts';
 
-export default function MobileTraderDock({ prices = {} }) {
+function MobileTraderDock({ prices = {} }) {
   const [selectedLot, setSelectedLot] = useState('0.10');
   const [lastExecuted, setLastExecuted] = useState(null);
 
@@ -87,3 +87,5 @@ export default function MobileTraderDock({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(MobileTraderDock);

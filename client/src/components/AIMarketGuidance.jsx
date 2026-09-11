@@ -2,11 +2,11 @@
 // Institutional Real-Time Market Guidance & Volatility Defense Engine
 // Instant 0ms quantitative computation driven by live sub-second ticks, SMC auction structure, and intermarket vectors
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { RefreshCw, Volume2, ShieldAlert, Zap, Sparkles } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
-export default function AIMarketGuidance({
+function AIMarketGuidance({
   prices = {},
   activeSession = 'London/NY Overlap',
   calendarData = {},
@@ -362,3 +362,5 @@ export default function AIMarketGuidance({
     </div>
   );
 }
+
+export default memo(AIMarketGuidance);

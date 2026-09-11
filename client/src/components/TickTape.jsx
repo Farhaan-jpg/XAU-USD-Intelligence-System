@@ -2,10 +2,10 @@
 // Sub-Second Real-Time Micro-Tick Tape & Tape Velocity Gauge (Ticks Per Second)
 // Visualizes aggressive market order flow, tape acceleration, and microsecond price direction
 
-import { useMemo } from 'react';
+import { useMemo, memo} from 'react';
 import { Zap, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 
-export default function TickTape({ prices = {} }) {
+function TickTape({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
 
@@ -90,3 +90,5 @@ export default function TickTape({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(TickTape);

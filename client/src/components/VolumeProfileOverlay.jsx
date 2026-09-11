@@ -2,10 +2,10 @@
 // Intraday Volume Profile (VPVR) Ribbon: Point of Control (POC), Value Area High (VAH), Value Area Low (VAL)
 // Visualizes session volume distribution directly beside market execution levels
 
-import { useMemo } from 'react';
+import { useMemo, memo} from 'react';
 import { BarChart3, Target } from 'lucide-react';
 
-export default function VolumeProfileOverlay({ prices = {} }) {
+function VolumeProfileOverlay({ prices = {} }) {
   const gold = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
   const vp = gold.volumeProfile || {};
@@ -102,3 +102,5 @@ export default function VolumeProfileOverlay({ prices = {} }) {
     </div>
   );
 }
+
+export default memo(VolumeProfileOverlay);

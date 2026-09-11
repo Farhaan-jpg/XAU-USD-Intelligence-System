@@ -2,12 +2,12 @@
 // Institutional Confluence & Composite Market Bias Engine
 // Integrates Intermarket Macro, Professional Trader Psychology & Contrarian Traps, SMC Liquidity, and News Vectors
 
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, memo} from 'react';
 import { ShieldAlert, TrendingUp, TrendingDown, Gauge, Minus, BrainCircuit, Users, Target, Compass } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 import { calculateFearGreed, analyzeTraderPsychology } from '../utils/sentimentEngine';
 
-export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarData = {}, cotData = {} }) {
+function ConfluenceMeter({ prices = {}, newsFeed = [], calendarData = {}, cotData = {} }) {
   const calculation = useMemo(() => {
     const gold = prices['GC=F'] || prices['XAUUSD'] || {};
     const dxy = prices['DX-Y.NYB'] || {};
@@ -526,3 +526,5 @@ export default function ConfluenceMeter({ prices = {}, newsFeed = [], calendarDa
     </div>
   );
 }
+
+export default memo(ConfluenceMeter);
