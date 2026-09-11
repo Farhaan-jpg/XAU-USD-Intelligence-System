@@ -273,24 +273,13 @@ XAU/USD Intelligence System`;
         {/* ── ROW A: Session Timeline (full width) ────────────────── */}
         <SessionClock />
 
-        {/* ── ROW B: Primary Grid — Chart + Right Intelligence Sidebar ─ */}
+        {/* ── ROW B: Primary Grid — Chart + Liquidity Map & Intelligence Sidebar ─ */}
         <div className="apex-grid-primary">
 
-          {/* LEFT COLUMN — Chart + sub-analytics */}
+          {/* LEFT COLUMN — Price Action Chart + SMC Liquidity Map */}
           <div className="apex-col-left">
             <TradingChart prices={prices} />
-
-            {/* Asian Range + Volatility Trap */}
-            <div className="grid-sub-2col">
-              <AsianRangeBox prices={prices} />
-              <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
-            </div>
-
-            {/* Killzone + Correlation */}
-            <div className="grid-sub-2col">
-              <KillzoneTracker prices={prices} />
-              <CorrelationMatrix prices={prices} />
-            </div>
+            <SmartLiquidityRadar prices={prices} />
           </div>
 
           {/* RIGHT SIDEBAR — Intelligence Stack */}
@@ -306,20 +295,29 @@ XAU/USD Intelligence System`;
               calendarData={calendarData}
               cotData={cotData}
             />
-            <SmartLiquidityRadar prices={prices} />
+          </div>
+        </div>
+
+        {/* ── ROW C: Session Microstructure, Traps & Correlation Matrix ─ */}
+        <div className="apex-grid-micro">
+          <AsianRangeBox prices={prices} />
+          <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
+          <KillzoneTracker prices={prices} />
+          <CorrelationMatrix prices={prices} />
+        </div>
+
+        {/* ── ROW D: Bottom 3-col — Calendar · Sentiment Stack · News Wire ─ */}
+        <div className="apex-grid-bottom">
+          <EconomicCalendar calendarData={calendarData} />
+          <div className="sentiment-stack">
             <FearGreedGauge
               prices={prices}
               newsFeed={newsFeed}
               calendarData={calendarData}
               cotData={cotData}
             />
+            <COTSentimentGauge cotData={cotData} />
           </div>
-        </div>
-
-        {/* ── ROW C: Bottom 3-col — Calendar · COT · News ─────────── */}
-        <div className="apex-grid-bottom">
-          <EconomicCalendar calendarData={calendarData} />
-          <COTSentimentGauge cotData={cotData} />
           <NewsTerminal newsFeed={newsFeed} />
         </div>
 

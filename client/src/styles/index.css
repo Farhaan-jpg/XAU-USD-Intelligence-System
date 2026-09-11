@@ -457,7 +457,7 @@ input, select, textarea { font-family: var(--font-sans); }
 /* ─── Primary 2-col: Chart + Sidebar ──────────────────────────────────── */
 .apex-grid-primary {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr 380px;
   gap: 8px;
   align-items: start;
 }
@@ -476,6 +476,13 @@ input, select, textarea { font-family: var(--font-sans); }
   gap: 8px;
 }
 
+/* ─── Session Microstructure & Traps 2x2 Grid ─────────────────────────── */
+.apex-grid-micro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 /* ─── 4-col analytics row ─────────────────────────────────────────────── */
 .apex-grid-analytics {
   display: grid;
@@ -483,21 +490,29 @@ input, select, textarea { font-family: var(--font-sans); }
   gap: 8px;
 }
 
-/* ─── 3-col bottom row ────────────────────────────────────────────────── */
+/* ─── 3-col bottom row: Calendar · Sentiment · News Wire ───────────────── */
 .apex-grid-bottom {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
+  grid-template-columns: 1.3fr 1fr 1.2fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.sentiment-stack {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 /* Legacy grid aliases */
-.grid-terminal-top    { display: grid; grid-template-columns: 1fr 360px; gap: 8px; }
+.grid-terminal-top    { display: grid; grid-template-columns: 1fr 380px; gap: 8px; }
 .terminal-column-left { display: flex; flex-direction: column; gap: 8px; }
 .terminal-column-right{ display: flex; flex-direction: column; gap: 8px; }
 .grid-sub-2col        { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.grid-macro-row       { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; }
+.grid-macro-row       { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr; gap: 8px; }
 .macro-view-grid      { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .macro-view-sidebar   { display: flex; flex-direction: column; gap: 8px; }
+
 
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1142,24 +1157,25 @@ input, select, textarea { font-family: var(--font-sans); }
    ════════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 1400px) {
-  .apex-grid-primary { grid-template-columns: 1fr 320px; }
-  .grid-terminal-top { grid-template-columns: 1fr 320px; }
+  .apex-grid-primary { grid-template-columns: 1fr 340px; }
+  .grid-terminal-top { grid-template-columns: 1fr 340px; }
 }
 @media (max-width: 1200px) {
   .apex-grid-primary, .grid-terminal-top { grid-template-columns: 1fr; }
   .apex-grid-analytics { grid-template-columns: repeat(2, 1fr); }
-  .apex-grid-bottom, .grid-macro-row    { grid-template-columns: 1fr 1fr; }
+  .apex-grid-micro { grid-template-columns: 1fr; }
+  .apex-grid-bottom, .grid-macro-row    { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
   .apex-grid-analytics { grid-template-columns: repeat(2, 1fr); }
-  .grid-sub-2col { grid-template-columns: 1fr 1fr; }
+  .apex-grid-micro, .grid-sub-2col { grid-template-columns: 1fr; }
   .apex-grid-bottom, .grid-macro-row { grid-template-columns: 1fr; }
   .macro-strip { height: auto; padding: 6px 10px; flex-wrap: wrap; }
   .macro-ribbon-item { min-width: 90px; }
 }
 @media (max-width: 768px) {
   .apex-grid-primary, .grid-terminal-top,
-  .apex-grid-analytics, .apex-grid-bottom,
+  .apex-grid-analytics, .apex-grid-bottom, .apex-grid-micro,
   .grid-macro-row, .grid-sub-2col { grid-template-columns: 1fr; }
   .apex-main { padding: 6px 6px 80px; gap: 6px; }
   .interactive-chart-box { height: 320px; }

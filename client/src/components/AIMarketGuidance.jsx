@@ -287,73 +287,75 @@ function AIMarketGuidance({
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '12px', marginTop: '2px' }}>
-        {/* Left Column: Real-Time Guidance Narrative */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-main)', lineHeight: '1.6' }}>
-            {deepAiData?.guidance || realTimeGuidance.guidance}
-          </div>
-
-          {realTimeGuidance.warnings && realTimeGuidance.warnings.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '6px',
-                fontSize: '11px',
-                color: isCritical ? 'var(--bear-primary)' : 'var(--gold-primary)',
-                background: isCritical ? 'var(--bear-bg)' : 'var(--gold-bg)',
-                border: `1px solid ${isCritical ? 'var(--border-bear)' : 'rgba(245, 158, 11, 0.2)'}`,
-                padding: '6px 10px',
-                borderRadius: 'var(--radius-sm)',
-              }}
-            >
-              <ShieldAlert size={13} style={{ flexShrink: 0, marginTop: '2px' }} />
-              <span>{realTimeGuidance.warnings[0]}</span>
-            </div>
-          )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+        {/* Real-Time Guidance Narrative */}
+        <div style={{ fontSize: '12px', color: 'var(--text-main)', lineHeight: '1.6' }}>
+          {deepAiData?.guidance || realTimeGuidance.guidance}
         </div>
 
-        {/* Right Column: Key Structural Levels & Defense Protocols */}
+        {realTimeGuidance.warnings && realTimeGuidance.warnings.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '6px',
+              fontSize: '11px',
+              color: isCritical ? 'var(--bear-primary)' : 'var(--gold-primary)',
+              background: isCritical ? 'var(--bear-bg)' : 'var(--gold-bg)',
+              border: `1px solid ${isCritical ? 'var(--border-bear)' : 'rgba(245, 158, 11, 0.2)'}`,
+              padding: '6px 10px',
+              borderRadius: 'var(--radius-sm)',
+            }}
+          >
+            <ShieldAlert size={13} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <span>{realTimeGuidance.warnings[0]}</span>
+          </div>
+        )}
+
+        {/* Defense Parameters 2x2 Grid */}
         <div
           style={{
-            background: 'rgba(0,0,0,0.2)',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '6px',
+            background: 'rgba(0,0,0,0.25)',
             borderRadius: 'var(--radius-sm)',
             padding: '8px 10px',
             border: '1px solid var(--border-subtle)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
           }}
         >
-          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            DEFENSE PARAMETERS
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Position Sizing</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: isCritical ? 'var(--bear-primary)' : isElevated ? 'var(--gold-primary)' : 'var(--bull-primary)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Position Sizing
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: isCritical ? 'var(--bear-primary)' : isElevated ? 'var(--gold-primary)' : 'var(--bull-primary)' }}>
               {realTimeGuidance.positionSizing}
             </span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Execution Filter</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
-              {realTimeGuidance.executionFilter}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Volatility Guard
             </span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '3px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Volatility Guard</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: isCritical ? 'var(--bear-primary)' : 'var(--bull-primary)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: isCritical ? 'var(--bear-primary)' : 'var(--bull-primary)' }}>
               {realTimeGuidance.volatilityGuard}
             </span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Key Invalidation</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--cyan-primary)', fontWeight: 600 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Execution Filter
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-main)' }}>
+              {realTimeGuidance.executionFilter}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Key Invalidation
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--cyan-primary)', fontWeight: 600 }}>
               {realTimeGuidance.invalidationLevel}
             </span>
           </div>
