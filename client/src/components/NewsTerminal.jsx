@@ -1,7 +1,7 @@
 // client/src/components/NewsTerminal.jsx
 // Real-Time Financial & Macro Wire with Live Search, Pinning/Bookmarks, and CSV Export
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { Newspaper, Copy, Check, Volume2, ExternalLink, Search, Bookmark, BookmarkCheck, Download, X } from 'lucide-react';
 import { speakSquawk } from '../utils/audioAlerts';
 
@@ -20,7 +20,7 @@ function formatTimeAgo(dateStr) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function NewsTerminal({ newsFeed = [] }) {
+function NewsTerminal({ newsFeed = [] }) {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'HIGH' | 'BULLISH' | 'BEARISH' | 'GEO' | 'PINNED'
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
@@ -401,3 +401,5 @@ export default function NewsTerminal({ newsFeed = [] }) {
     </div>
   );
 }
+
+export default memo(NewsTerminal);

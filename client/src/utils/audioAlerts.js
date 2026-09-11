@@ -679,6 +679,12 @@ export function speakSquawk(message, options = {}) {
         pitch: options.pitch,
       });
     }
+
+    // Prune queue to prevent audio speech backlog during rapid volatility events
+    if (speechQueue.length > 3) {
+      speechQueue.splice(0, speechQueue.length - 3);
+    }
+
     processQueue();
   }, chimeDelay);
 }

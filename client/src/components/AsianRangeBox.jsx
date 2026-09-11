@@ -83,6 +83,19 @@ export default function AsianRangeBox({ prices = {} }) {
         }
       }
 
+      // Avoid redundant disk I/O and state re-renders if range boundaries are unchanged
+      if (
+        prev.high === nextHigh &&
+        prev.low === nextLow &&
+        prev.locked === nextLocked &&
+        prev.bslSwept === nextBslSwept &&
+        prev.sslSwept === nextSslSwept &&
+        prev.bslSweptPrice === nextBslPrice &&
+        prev.sslSweptPrice === nextSslPrice
+      ) {
+        return prev;
+      }
+
       const updated = {
         high: nextHigh,
         low: nextLow,

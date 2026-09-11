@@ -1,10 +1,10 @@
 // client/src/components/SessionClock.jsx
 // Linear 24-Hour Global Session Timeline & Volatility Regime Ribbon
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Globe } from 'lucide-react';
 
-export default function SessionClock() {
+function SessionClock() {
   const [currentUtcHour, setCurrentUtcHour] = useState(new Date().getUTCHours());
   const [currentUtcMin, setCurrentUtcMin] = useState(new Date().getUTCMinutes());
 
@@ -116,3 +116,5 @@ export default function SessionClock() {
     </div>
   );
 }
+
+export default memo(SessionClock);

@@ -1,10 +1,10 @@
 // client/src/components/COTSentimentGauge.jsx
 // Institutional CFTC Commitment of Traders (COT) with Unified Stacked Delta Bar & Retail Positioning
 
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { Award } from 'lucide-react';
 
-export default function COTSentimentGauge({ cotData: externalCotData }) {
+function COTSentimentGauge({ cotData: externalCotData }) {
   const cotData = useMemo(() => {
     if (externalCotData) {
       const mm = externalCotData.managedMoney || {};
@@ -219,3 +219,5 @@ export default function COTSentimentGauge({ cotData: externalCotData }) {
     </div>
   );
 }
+
+export default memo(COTSentimentGauge);

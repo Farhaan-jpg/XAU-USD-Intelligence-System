@@ -1,10 +1,10 @@
 // client/src/components/EconomicCalendar.jsx
 // Tabular Institutional Economic Calendar with Timezone Switcher, Standardized Surprise Index & Live Countdown Engine
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { Calendar as CalendarIcon, Timer, Globe, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
-export default function EconomicCalendar({ calendarData = {} }) {
+function EconomicCalendar({ calendarData = {} }) {
   const [filterMode, setFilterMode] = useState('ALL'); // 'ALL' | 'HIGH' | 'USD'
   const [tz, setTz] = useState('UTC'); // 'UTC' | 'EST' | 'GMT' | 'IST' | 'LOCAL'
   const [now, setNow] = useState(Date.now());
@@ -263,3 +263,5 @@ export default function EconomicCalendar({ calendarData = {} }) {
     </div>
   );
 }
+
+export default memo(EconomicCalendar);

@@ -10,6 +10,7 @@ export default function VolatilityTrapDetector({ prices = {} }) {
   const currentPrice = parseFloat(gold.price || 0);
 
   const priceHistory = useRef([]);
+  const lastAlertTimeRef = useRef(0);
   const [trapAlert, setTrapAlert] = useState(null);
 
   // Monitor velocity over last 60 seconds
@@ -27,8 +28,9 @@ export default function VolatilityTrapDetector({ prices = {} }) {
       const delta = newest - oldest;
       const absDelta = Math.abs(delta);
 
-      // Rapid expansion threshold: $6+ move in <60s
-      if (absDelta >= 6.0) {
+      // Rapid expansion threshold: $6+ move in <60s with 45s cooldown
+      if (absDelta >= 6.0 && now - lastAlertTimeRef.current > 45000) {
+        lastAlertTimeRef.current = now;
         const isUp = delta > 0;
         setTrapAlert({
           type: isUp ? 'UPSIDE_BLOWOFF' : 'DOWNSIDE_SWEEP',
@@ -40,10 +42,14 @@ export default function VolatilityTrapDetector({ prices = {} }) {
             : 'Caution: Rapid downside selling velocity. Institutional stop run / sell-side liquidity liquidation in progress.',
           color: isUp ? 'var(--bull-primary)' : 'var(--bear-primary)',
           timestamp: new Date().toLocaleTimeString(),
+          timeMs: now,
         });
+      } else if (absDelta < 2.5 && trapAlert && now - (trapAlert.timeMs || 0) > 60000) {
+        // Auto-dismiss once market velocity normalizes
+        setTrapAlert(null);
       }
     }
-  }, [currentPrice]);
+  }, [currentPrice, trapAlert]);
 
   useEffect(() => {
     if (trapAlert) {
@@ -54,10 +60,11 @@ export default function VolatilityTrapDetector({ prices = {} }) {
           category: 'volatility',
           preChime: isBear ? 'bearish' : 'trap',
           priority: true,
+          dedupeKey: `vol_trap_${trapAlert.type}_${Math.floor((trapAlert.timeMs || Date.now()) / 45000)}`,
         }
       );
     }
-  }, [trapAlert?.timestamp]);
+  }, [trapAlert?.timeMs]);
 
   return (
     <div
