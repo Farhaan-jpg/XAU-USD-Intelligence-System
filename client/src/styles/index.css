@@ -448,10 +448,17 @@ button { font-family: var(--font-sans); }
   gap: 10px;
 }
 
-/* 2-col sub-grid (Killzone + Correlation) */
+/* 2-col sub-grid (Killzone + Correlation | AsianRange + Volatility) */
 .grid-sub-2col {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* 3-col Macro Row (Calendar | COT | News) */
+.grid-macro-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
   gap: 10px;
 }
 
@@ -469,16 +476,25 @@ button { font-family: var(--font-sans); }
   .grid-terminal-top {
     grid-template-columns: 1fr;
   }
+  .grid-macro-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 1024px) {
   .macro-view-grid {
     grid-template-columns: 1fr;
   }
+  .grid-macro-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 900px) {
   .grid-sub-2col {
+    grid-template-columns: 1fr;
+  }
+  .grid-macro-row {
     grid-template-columns: 1fr;
   }
   .terminal-header { padding: 0 10px; }
@@ -487,7 +503,8 @@ button { font-family: var(--font-sans); }
 
 @media (max-width: 768px) {
   .grid-terminal-top,
-  .macro-view-grid {
+  .macro-view-grid,
+  .grid-macro-row {
     grid-template-columns: 1fr;
   }
   .grid-sub-2col {
