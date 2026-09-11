@@ -1,5 +1,5 @@
 // client/src/components/Header.jsx
-// Institutional Real-Time Executive Header Bar — Single Dashboard, No View Tabs
+// APEX Terminal — Institutional Header Bar (single-screen, no view tabs)
 
 import { useState, useEffect, useRef, memo } from 'react';
 import {
@@ -10,44 +10,46 @@ import {
 import { isMuted, toggleAudioMute } from '../utils/audioAlerts';
 
 function Header({
-  connected = false,
-  latency = null,
-  prices = {},
+  connected    = false,
+  latency      = null,
+  prices       = {},
   onOpenSettings,
   onOpenTelemetry,
   onOpenSoundboard,
   onOpenAlerts,
-  focusMode = false,
+  focusMode    = false,
   onToggleFocusMode = () => {},
-  alertsCount = 0,
+  alertsCount  = 0,
   onCopySnapshot,
 }) {
   const [audioMuted, setAudioMuted] = useState(isMuted());
-  const [utcTime, setUtcTime]       = useState('');
-  const [copied, setCopied]         = useState(false);
+  const [utcTime,    setUtcTime]    = useState('');
+  const [copied,     setCopied]     = useState(false);
 
-  // Live spot gold data
+  // ── Live spot price data ────────────────────────────────────────────────
   const gold      = prices['GC=F'] || prices['XAUUSD'] || {};
   const spotPrice = parseFloat(gold.price || 0);
   const changePct = parseFloat(gold.changeDay || gold.change5m || 0);
   const isUp      = changePct >= 0;
   const tps       = typeof gold.tapeSpeed === 'number' ? gold.tapeSpeed : 1.2;
-  const tapeStatus = gold.tapeSpeedStatus || (tps >= 8.0 ? 'SURGE' : tps >= 3.0 ? 'FAST' : 'NORM');
+  const tapeLabel = tps >= 8.0 ? 'SURGE' : tps >= 3.0 ? 'FAST' : 'NORM';
+  const tapePill  = tps >= 8.0 ? 'pill-bear' : tps >= 3.0 ? 'pill-gold' : '';
 
-  // Tick flash direction
-  const [tickDir, setTickDir]   = useState(null);
-  const prevPriceRef            = useRef(spotPrice);
+  // ── Tick direction flash ─────────────────────────────────────────────────
+  const [tickDir,    setTickDir]    = useState(null);
+  const prevPriceRef                = useRef(spotPrice);
   useEffect(() => {
-    if (spotPrice && prevPriceRef.current && spotPrice !== prevPriceRef.current) {
-      setTickDir(spotPrice > prevPriceRef.current ? 'up' : 'down');
-      const t = setTimeout(() => setTickDir(null), 320);
-      prevPriceRef.current = spotPrice;
-      return () => clearTimeout(t);
+    if (!spotPrice || !prevPriceRef.current || spotPrice === prevPriceRef.current) {
+      if (spotPrice) prevPriceRef.current = spotPrice;
+      return;
     }
-    if (spotPrice) prevPriceRef.current = spotPrice;
+    setTickDir(spotPrice > prevPriceRef.current ? 'up' : 'down');
+    prevPriceRef.current = spotPrice;
+    const t = setTimeout(() => setTickDir(null), 350);
+    return () => clearTimeout(t);
   }, [spotPrice]);
 
-  // UTC clock — updates every second
+  // ── UTC clock ────────────────────────────────────────────────────────────
   useEffect(() => {
     const tick = () => setUtcTime(new Date().toISOString().substring(11, 19) + ' UTC');
     tick();
@@ -55,76 +57,61 @@ function Header({
     return () => clearInterval(id);
   }, []);
 
-  const handleToggleAudio = () => {
-    const next = toggleAudioMute();
-    setAudioMuted(next);
-  };
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const handleToggleAudio = () => setAudioMuted(toggleAudioMute());
 
-  const handleSnapshotClick = () => {
-    if (onCopySnapshot) {
-      onCopySnapshot();
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleSnapshot = () => {
+    if (!onCopySnapshot) return;
+    onCopySnapshot();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <header className="terminal-header">
+    <header className="apex-header">
 
-      {/* ── Brand + Spot Ticker ─────────────────────────────────── */}
-      <div className="header-brand-group">
-        <div className="brand-icon">Au</div>
-        <div className="brand-text">
-          <div className="brand-title-row">
-            <span className="brand-title">XAU/USD INTELLIGENCE</span>
-            <span className="brand-badge-pro">PRO</span>
-          </div>
-          <span className="brand-subtitle">INSTITUTIONAL GOLD TERMINAL</span>
+      {/* ── Brand ───────────────────────────────────────────── */}
+      <div className="hdr-brand">
+        <div className="hdr-au-badge">Au</div>
+        <div className="hdr-brand-text">
+          <span className="hdr-brand-name">XAU/USD INTELLIGENCE</span>
+          <span className="hdr-brand-sub">INSTITUTIONAL GOLD TERMINAL</span>
         </div>
-
-        {spotPrice > 0 && (
-          <div className="header-spot-ticker" title="Live XAU/USD Spot Price">
-            <span
-              className={`header-spot-price${tickDir === 'up' ? ' tick-flash-up' : tickDir === 'down' ? ' tick-flash-down' : ''}`}
-            >
-              ${spotPrice.toFixed(2)}
-            </span>
-            <span
-              className="header-spot-change"
-              style={{ color: isUp ? 'var(--bull)' : 'var(--bear)' }}
-            >
-              {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-              {isUp ? '+' : ''}{changePct.toFixed(2)}%
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* ── Center Live Telemetry Pills ─────────────────────────── */}
-      <div className="header-center-telemetry">
+      {/* ── Live Price Chip ─────────────────────────────────── */}
+      {spotPrice > 0 && (
+        <div className="hdr-price-chip" title="Live XAU/USD spot price (OANDA primary feed)">
+          <span className="hdr-label">SPOT</span>
+          <span
+            className={`hdr-price-num${tickDir === 'up' ? ' tick-flash-up' : tickDir === 'down' ? ' tick-flash-down' : ''}`}
+          >
+            ${spotPrice.toFixed(2)}
+          </span>
+          <span
+            className="hdr-price-chg"
+            style={{ color: isUp ? 'var(--bull)' : 'var(--bear)' }}
+          >
+            {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+            {isUp ? '+' : ''}{changePct.toFixed(2)}%
+          </span>
+        </div>
+      )}
 
-        {/* Tape Velocity */}
-        <div
-          className="header-pill"
-          title="Aggressive order tape speed (ticks/second)"
-          style={{
-            borderColor: tapeStatus === 'SURGE' ? 'var(--bear-border)' : tapeStatus === 'FAST' ? 'var(--gold-border)' : undefined,
-            color:       tapeStatus === 'SURGE' ? 'var(--bear)' : tapeStatus === 'FAST' ? 'var(--gold)' : undefined,
-          }}
-        >
-          <Activity size={11} className={tapeStatus === 'SURGE' ? 'pulse-fast' : ''} />
-          <span>{tps.toFixed(1)} TPS · {tapeStatus}</span>
+      {/* ── Centre Telemetry Strip ──────────────────────────── */}
+      <div className="hdr-telemetry">
+
+        {/* Tape Speed Pill */}
+        <div className={`hdr-pill ${tapePill}`} title="Order tape velocity (ticks/sec)">
+          <Activity size={10} className={tapeLabel === 'SURGE' ? 'pulse-fast' : ''} />
+          <span>{tps.toFixed(1)} TPS · {tapeLabel}</span>
         </div>
 
-        {/* ADR % */}
+        {/* ADR Expansion */}
         {gold.adrPercent !== undefined && (
           <div
-            className="header-pill"
-            title={`Average Daily Range expansion — $${gold.dayRange || 0}`}
-            style={{
-              borderColor: gold.adrPercent >= 100 ? 'var(--bear-border)' : gold.adrPercent >= 75 ? 'var(--gold-border)' : undefined,
-              color:       gold.adrPercent >= 100 ? 'var(--bear)' : gold.adrPercent >= 75 ? 'var(--gold)' : undefined,
-            }}
+            className={`hdr-pill${gold.adrPercent >= 100 ? ' pill-bear' : gold.adrPercent >= 75 ? ' pill-gold' : ''}`}
+            title={`Average Daily Range expansion — $${gold.dayRange || 0} of ~$32 benchmark`}
           >
             <span>ADR {gold.adrPercent}% · ${gold.dayRange || 0}</span>
           </div>
@@ -132,48 +119,63 @@ function Header({
 
         {/* Volatility Surge */}
         {gold.volatilitySurge && (
-          <div className="header-pill surge-alert" title="Rapid volatility expansion detected!">
-            <Zap size={11} />
+          <div className="hdr-pill pill-bear" title="Rapid volatility expansion detected">
+            <Zap size={10} />
             <span>VOL SURGE ${parseFloat(gold.volatilitySurge.priceShift || 0).toFixed(1)}</span>
           </div>
         )}
 
         {/* Active Session */}
         {gold.session && (
-          <div className="header-pill session-pill" title="Current global trading session">
+          <div className="hdr-pill pill-cyan" title="Current global trading session">
             <Crosshair size={10} />
             <span>{gold.session}</span>
           </div>
         )}
+
+        {/* Session VWAP */}
+        {gold.sessionVWAP && (
+          <div className="hdr-pill" title="Session VWAP — institutional reference level">
+            <span>VWAP ${parseFloat(gold.sessionVWAP).toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
-      {/* ── Right Controls ──────────────────────────────────────── */}
-      <div className="header-right-controls">
+      {/* ── Right Controls ──────────────────────────────────── */}
+      <div className="hdr-controls">
 
-        {/* Latency / Connection */}
+        {/* Connection + Latency */}
         <button
-          className="header-telemetry-btn"
+          className="hdr-conn"
           onClick={onOpenTelemetry}
-          title="Feed latency, heartbeat & failover status"
+          title="Feed latency, heartbeat & failover — click to inspect"
         >
-          <span className={`status-dot ${connected ? 'online' : ''}`} />
+          <span className={`dot ${connected ? 'live' : ''}`} />
           <span>{latency !== null ? `${latency}ms` : connected ? 'LIVE' : 'OFFLINE'}</span>
-          <Radio size={10} style={{ opacity: 0.5 }} />
+          <Radio size={9} style={{ opacity: 0.45 }} />
         </button>
 
         {/* UTC Clock */}
-        <div className="header-time-pill">
-          <Clock size={10} style={{ opacity: 0.5 }} />
+        <div className="hdr-clock">
+          <Clock size={9} />
           <span>{utcTime}</span>
         </div>
 
         {/* Soundboard */}
-        <button className="btn-ghost-icon" onClick={onOpenSoundboard} title="Audio squawk soundboard (B)">
+        <button
+          className="hdr-btn"
+          onClick={onOpenSoundboard}
+          title="Audio squawk soundboard (B)"
+        >
           <Sliders size={13} style={{ color: 'var(--gold)' }} />
         </button>
 
         {/* Copy Snapshot */}
-        <button className="btn-ghost-icon" onClick={handleSnapshotClick} title="Copy executive snapshot (C)">
+        <button
+          className="hdr-btn"
+          onClick={handleSnapshot}
+          title="Copy executive intelligence snapshot (C)"
+        >
           {copied
             ? <Check size={13} style={{ color: 'var(--bull)' }} />
             : <Copy size={13} />}
@@ -181,43 +183,50 @@ function Header({
 
         {/* Price Alerts */}
         <button
-          className="btn-ghost-icon"
+          className="hdr-btn"
           onClick={onOpenAlerts}
-          title={`Custom price level alerts (P)${alertsCount > 0 ? ` — ${alertsCount} active` : ''}`}
+          title={`Price level alerts (P)${alertsCount > 0 ? ` — ${alertsCount} active` : ''}`}
           style={{ position: 'relative' }}
         >
           <Bell size={13} style={{ color: alertsCount > 0 ? 'var(--gold)' : undefined }} />
           {alertsCount > 0 && (
-            <span style={{ position: 'absolute', top: '4px', right: '4px', width: '5px', height: '5px', borderRadius: '50%', background: 'var(--gold)' }} />
+            <span style={{
+              position: 'absolute', top: '5px', right: '5px',
+              width: '5px', height: '5px', borderRadius: '50%',
+              background: 'var(--gold)',
+            }} />
           )}
         </button>
 
         {/* Audio Mute */}
         <button
-          className={`btn-ghost-icon${audioMuted ? ' active' : ''}`}
+          className={`hdr-btn${audioMuted ? ' muted' : ''}`}
           onClick={handleToggleAudio}
-          title={audioMuted ? 'Unmute squawks (M)' : 'Mute all audio (M)'}
+          title={audioMuted ? 'Unmute audio squawks (M)' : 'Mute all audio (M)'}
         >
           {audioMuted
-            ? <VolumeX size={13} style={{ color: 'var(--bear)' }} />
+            ? <VolumeX size={13} />
             : <Volume2 size={13} />}
         </button>
 
         {/* Focus Mode */}
         <button
-          className={`btn-ghost-icon${focusMode ? ' active' : ''}`}
+          className={`hdr-btn${focusMode ? ' active' : ''}`}
           onClick={onToggleFocusMode}
           title={focusMode ? 'Exit focus mode (F)' : 'Enter focus mode (F)'}
         >
-          {focusMode
-            ? <EyeOff size={13} style={{ color: 'var(--cyan)' }} />
-            : <Eye size={13} />}
+          {focusMode ? <EyeOff size={13} /> : <Eye size={13} />}
         </button>
 
         {/* Settings */}
-        <button className="btn-ghost-icon" onClick={onOpenSettings} title="Settings (S)">
+        <button
+          className="hdr-btn"
+          onClick={onOpenSettings}
+          title="Settings, webhooks & AI configuration (S)"
+        >
           <Settings size={13} />
         </button>
+
       </div>
     </header>
   );

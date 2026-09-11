@@ -151,84 +151,37 @@ function MacroRadar({ prices = {} }) {
   ];
 
   return (
-    <div className="panel-card">
-      <div className="panel-header">
-        <span className="panel-title">
-          <Radar size={13} />
-          8-ASSET INTERMARKET CORRELATION RIBBON
-        </span>
-        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
-          CROSS-ASSET RADAR
-        </span>
-      </div>
-
-      {/* Divergence Notification Callout */}
-      {divergence && (
-        <div
-          style={{
-            background: 'rgba(0,0,0,0.25)',
-            borderLeft: `3px solid ${divergence.color}`,
-            borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '11px',
-          }}
-        >
-          <AlertTriangle size={15} style={{ color: divergence.color, flexShrink: 0 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <strong style={{ color: 'var(--text-main)' }}>{divergence.title}:</strong>
-            <span style={{ color: 'var(--text-muted)' }}>{divergence.desc}</span>
-            <span
-              style={{
-                fontSize: '9px',
-                fontWeight: 600,
-                padding: '1px 5px',
-                borderRadius: '3px',
-                background: 'rgba(255,255,255,0.06)',
-                color: divergence.color,
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              {divergence.badge}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* 8-Column High-Density Ticker Grid */}
-      <div className="macro-ribbon-grid">
-        {assets.map((a) => {
-          const chgNum = parseFloat(a.chg || 0);
-          const isUp = chgNum > 0;
-          return (
-            <div
-              key={a.symbol}
-              className="macro-ribbon-item"
-              style={{
-                borderColor: a.isPrimary ? 'rgba(234, 179, 8, 0.25)' : undefined,
-                background: a.isPrimary ? 'rgba(234, 179, 8, 0.04)' : undefined,
-              }}
-            >
-              <div className="macro-ribbon-name">
-                <span>{a.name}</span>
-                <span style={{ fontSize: '9px', opacity: 0.6 }}>{a.corr}</span>
-              </div>
-
-              <div className="macro-ribbon-price">{a.price}</div>
-
-              <div
-                className="macro-ribbon-chg"
-                style={{ color: chgNum === 0 ? 'var(--text-dim)' : isUp ? 'var(--bull-primary)' : 'var(--bear-primary)' }}
-              >
-                {chgNum !== 0 && (isUp ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />)}
-                <span>{chgNum > 0 ? '+' : ''}{chgNum.toFixed(2)}%</span>
-              </div>
+    <div className="macro-strip">
+      {assets.map((a) => {
+        const chgNum = parseFloat(a.chg || 0);
+        const isUp   = chgNum > 0;
+        return (
+          <div
+            key={a.symbol}
+            className="macro-ribbon-item"
+            style={{
+              borderColor: a.isPrimary ? 'rgba(201,168,78,0.35)' : undefined,
+              background:  a.isPrimary ? 'rgba(201,168,78,0.04)' : undefined,
+            }}
+            title={`${a.label} — ${a.corr}`}
+          >
+            <div className="macro-ribbon-name">
+              <span style={{ color: a.isPrimary ? 'var(--gold)' : undefined }}>{a.name}</span>
+              <span style={{ fontSize: '8px', opacity: 0.5, fontFamily: 'var(--font-mono)' }}>{a.corr}</span>
             </div>
-          );
-        })}
-      </div>
+            <div className="macro-ribbon-price"
+              style={{ color: a.isPrimary ? 'var(--t1)' : undefined }}
+            >{a.price}</div>
+            <div
+              className="macro-ribbon-chg"
+              style={{ color: chgNum === 0 ? 'var(--t3)' : isUp ? 'var(--bull)' : 'var(--bear)' }}
+            >
+              {chgNum !== 0 && (isUp ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />)}
+              <span>{chgNum > 0 ? '+' : ''}{chgNum.toFixed(2)}%</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
