@@ -2,47 +2,48 @@
 /* Institutional Dark-Mode Design System (Linear / TradingView Pro / Raycast / Bloomberg) */
 
 :root {
-  /* Surface & Base Tokens */
-  --bg-core: #0B0E14;
-  --bg-surface: #111620;
-  --bg-surface-hover: #161D2A;
-  --bg-panel: #111620;
-  --bg-panel-hover: #161D2A;
-  --bg-card: #111620;
-  --bg-glass: rgba(17, 22, 32, 0.75);
+  /* True Dark Mode (OLED-friendly) Surfaces */
+  --bg-core: #121212;
+  --bg-surface: #1E1E1E;
+  --bg-surface-hover: #242424;
+  --bg-panel: #1E1E1E;
+  --bg-panel-hover: #242424;
+  --bg-card: #1E1E1E;
+  --bg-card-elevated: #242424;
+  --bg-glass: rgba(30, 30, 30, 0.85);
 
-  /* Subtle 1px Borders */
+  /* Minimalist 1px Borders */
   --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-medium: rgba(255, 255, 255, 0.12);
-  --border-focus: rgba(56, 189, 248, 0.35);
+  --border-medium: rgba(255, 255, 255, 0.10);
+  --border-focus: rgba(212, 175, 55, 0.4);
 
   /* Typography Colors */
-  --text-main: #F1F5F9;       /* Slate 100 */
+  --text-main: #F8FAFC;       /* Slate 50 */
   --text-secondary: #94A3B8;  /* Slate 400 */
   --text-muted: #94A3B8;      /* Slate 400 */
   --text-dim: #64748B;        /* Slate 500 */
 
-  /* Desaturated Semantic Accents */
+  /* Muted Sophisticated Semantic Accents */
   --bull-primary: #10B981;    /* Emerald 500 */
-  --bull-glow: #10B981;
+  --bull-glow: #34D399;
   --bull-bg: rgba(16, 185, 129, 0.08);
-  --border-bull: rgba(16, 185, 129, 0.25);
+  --border-bull: rgba(16, 185, 129, 0.22);
 
-  --bear-primary: #F43F5E;    /* Rose 500 */
-  --bear-glow: #F43F5E;
+  --bear-primary: #F43F5E;    /* Soft Crimson 500 */
+  --bear-glow: #FB7185;
   --bear-bg: rgba(244, 63, 94, 0.08);
-  --border-bear: rgba(244, 63, 94, 0.25);
+  --border-bear: rgba(244, 63, 94, 0.22);
 
-  --gold-primary: #F59E0B;    /* Amber 500 */
-  --gold-glow: #F59E0B;
-  --gold-bg: rgba(245, 158, 11, 0.08);
-  --border-gold: rgba(245, 158, 11, 0.25);
+  --gold-primary: #D4AF37;    /* Subtle Metallic Gold */
+  --gold-glow: #E5C07B;
+  --gold-bg: rgba(212, 175, 55, 0.08);
+  --border-gold: rgba(212, 175, 55, 0.22);
 
   --cyan-primary: #38BDF8;    /* Sky 400 */
   --cyan-glow: #38BDF8;
   --cyan-bg: rgba(56, 189, 248, 0.08);
 
-  --brand-gold: #EAB308;
+  --brand-gold: #D4AF37;
 
   --purple-primary: #A855F7;  /* Violet 500 */
   --purple-bg: rgba(168, 85, 247, 0.08);
@@ -57,7 +58,8 @@
   --radius-lg: 12px;
 
   /* Subtle Depth */
-  --shadow-panel: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-panel: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.5);
+  --shadow-dock: 0 -4px 20px rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -109,21 +111,62 @@ body {
   background: var(--bg-core);
 }
 
-/* 48px Slim Sticky Institutional Header */
+/* 42px Ultra-Thin Sticky Institutional Header */
 .terminal-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  height: 48px;
-  background: rgba(11, 14, 20, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  height: 42px;
+  background: rgba(18, 18, 18, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-subtle);
   padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
+}
+
+/* Institutional Segmented View Switcher */
+.header-view-segmented {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 200ms ease-in-out;
+  white-space: nowrap;
+}
+
+.view-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.view-tab-btn.active {
+  background: var(--bg-surface-hover);
+  color: var(--gold-primary);
+  border-color: rgba(212, 175, 55, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .header-brand-group {
@@ -1136,13 +1179,37 @@ body {
   color: #fff;
 }
 
-/* Live Tick Highlights */
+/* Live Data Pulses (Subtle 500ms fading background pulse) */
+@keyframes pulseUpBg {
+  0% {
+    background-color: rgba(16, 185, 129, 0.25);
+    color: var(--bull-primary);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes pulseDownBg {
+  0% {
+    background-color: rgba(244, 63, 94, 0.25);
+    color: var(--bear-primary);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 .tick-flash-up {
-  color: var(--bull-primary) !important;
+  animation: pulseUpBg 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-radius: 4px;
+  padding: 0 4px;
 }
 
 .tick-flash-down {
-  color: var(--bear-primary) !important;
+  animation: pulseDownBg 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-radius: 4px;
+  padding: 0 4px;
 }
 
 /* ─── Focus Mode / Dark Dimmer ────────────────────────── */
@@ -1599,3 +1666,338 @@ body {
     max-height: 90vh !important;
   }
 }
+
+/* ─── Bento-Box Modular Grid & Progressive Disclosure ─────────────── */
+.bento-card {
+  transition: all 200ms ease-in-out;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+
+.bento-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.bento-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  transition: background 200ms ease;
+}
+
+.bento-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bento-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.bento-icon {
+  color: var(--gold-primary);
+  flex-shrink: 0;
+}
+
+.bento-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.bento-summary-text {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.bento-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.bento-badge {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.bento-collapse-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  transition: all 200ms ease;
+}
+
+.bento-collapse-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.bento-body {
+  padding: 0 14px 14px 14px;
+}
+
+.bento-collapsed {
+  padding: 0;
+}
+
+/* ─── Macro View Layout Grid ──────────────────────────────────────── */
+.macro-view-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.macro-view-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 1024px) {
+  .macro-view-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Mobile Trader Execution Dock (Sticky Bottom) ─────────────── */
+.mobile-execution-dock {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  background: #141414;
+  border-top: 1px solid var(--border-medium);
+  box-shadow: var(--shadow-dock);
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) 12px;
+}
+
+.mobile-dock-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.mobile-btn-sell {
+  flex: 1;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid var(--border-bear);
+  color: var(--bear-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 200ms ease;
+  padding: 4px;
+}
+
+.mobile-btn-sell:active {
+  background: var(--bear-primary);
+  color: #fff;
+  transform: scale(0.98);
+}
+
+.mobile-btn-buy {
+  flex: 1;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid var(--border-bull);
+  color: var(--bull-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 200ms ease;
+  padding: 4px;
+}
+
+.mobile-btn-buy:active {
+  background: var(--bull-primary);
+  color: #fff;
+  transform: scale(0.98);
+}
+
+.btn-side-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.btn-price-quote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mobile-lot-selector-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.mobile-lot-label {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+.mobile-lot-select {
+  height: 44px;
+  min-width: 68px;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.mobile-execution-toast {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(18, 18, 18, 0.96);
+  border: 1px solid var(--border-bull);
+  color: var(--text-main);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── Swipeable Horizontal Carousel for Mobile ────────────────── */
+.carousel-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.carousel-track {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.carousel-dots-row {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-execution-dock {
+    display: block;
+  }
+
+  .app-terminal {
+    padding-bottom: 74px;
+  }
+
+  .carousel-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 12px;
+  }
+
+  .carousel-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .carousel-slide {
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+  }
+
+  .carousel-dots-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 0;
+  }
+
+  .carousel-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    cursor: pointer;
+    transition: all 200ms ease;
+    padding: 0;
+  }
+
+  .carousel-dot.active {
+    width: 16px;
+    border-radius: 3px;
+    background: var(--gold-primary);
+  }
+
+  /* Touch targets minimum 44px */
+  button.timeframe-btn,
+  button.tz-btn,
+  button.pivot-tag,
+  .mobile-lot-select {
+    min-height: 44px;
+  }
+}
+

@@ -7,6 +7,9 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const shortcuts = [
+    { key: '1', desc: 'Switch to Command Center (Chart, Order Flow & SMC)' },
+    { key: '2', desc: 'Switch to Macro View (Economic Calendar & Wire)' },
+    { key: 'V', desc: 'Toggle between Command Center and Macro View' },
     { key: 'C', desc: 'Copy Executive Market Intelligence Snapshot to Clipboard' },
     { key: 'T', desc: 'Open Feed Latency & Pipeline Telemetry Inspector' },
     { key: 'B', desc: 'Open Institutional Audio Squawk Soundboard' },

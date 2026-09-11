@@ -19,6 +19,8 @@ import {
   Crosshair,
   TrendingUp,
   TrendingDown,
+  LayoutGrid,
+  Globe,
 } from 'lucide-react';
 import { isMuted, toggleAudioMute } from '../utils/audioAlerts';
 
@@ -34,6 +36,8 @@ export default function Header({
   onToggleFocusMode = () => {},
   alertsCount = 0,
   onCopySnapshot,
+  activeView = 'COMMAND_CENTER',
+  onSelectView = () => {},
 }) {
   const [audioMuted, setAudioMuted] = useState(isMuted());
   const [utcTime, setUtcTime] = useState('');
@@ -112,6 +116,30 @@ export default function Header({
             </span>
           </div>
         )}
+      </div>
+
+      {/* Modern Institutional View Switcher */}
+      <div className="header-view-segmented" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'COMMAND_CENTER'}
+          className={`view-tab-btn ${activeView === 'COMMAND_CENTER' ? 'active' : ''}`}
+          onClick={() => onSelectView('COMMAND_CENTER')}
+        >
+          <LayoutGrid size={12} />
+          <span>COMMAND CENTER</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'MACRO_VIEW'}
+          className={`view-tab-btn ${activeView === 'MACRO_VIEW' ? 'active' : ''}`}
+          onClick={() => onSelectView('MACRO_VIEW')}
+        >
+          <Globe size={12} />
+          <span>MACRO VIEW</span>
+        </button>
       </div>
 
       {/* Center: Real-Time Telemetry & Status Badges */}

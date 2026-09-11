@@ -25,6 +25,8 @@ import PriceAlerts from './components/PriceAlerts';
 import AsianRangeBox from './components/AsianRangeBox';
 import FearGreedGauge from './components/FearGreedGauge';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
+import MobileTraderDock from './components/MobileTraderDock';
+import MobileAnalyticsCarousel from './components/MobileAnalyticsCarousel';
 import { speakSquawk, toggleAudioMute, playChime } from './utils/audioAlerts';
 import { AlertTriangle, EyeOff } from 'lucide-react';
 
@@ -39,6 +41,9 @@ export default function App() {
     latestAlert,
     calendarAlert,
   } = useSocket();
+
+  // Active Modular View: 'COMMAND_CENTER' (Chart & Order Flow) vs 'MACRO_VIEW' (Calendar & Wire)
+  const [activeView, setActiveView] = useState('COMMAND_CENTER');
 
   // Modals & Mode States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -187,7 +192,16 @@ export default function App() {
 
       const key = e.key;
 
-      if (key === 'm' || key === 'M') {
+      if (key === '1') {
+        e.preventDefault();
+        setActiveView('COMMAND_CENTER');
+      } else if (key === '2') {
+        e.preventDefault();
+        setActiveView('MACRO_VIEW');
+      } else if (key === 'v' || key === 'V') {
+        e.preventDefault();
+        setActiveView((v) => (v === 'COMMAND_CENTER' ? 'MACRO_VIEW' : 'COMMAND_CENTER'));
+      } else if (key === 'm' || key === 'M') {
         e.preventDefault();
         toggleAudioMute();
       } else if (key === 'g' || key === 'G') {
@@ -283,7 +297,7 @@ export default function App() {
 
   return (
     <div className={`app-terminal ${focusMode ? 'focus-mode-active' : ''}`}>
-      {/* Institutional Real-Time Telemetry Bar (No Tabs) */}
+      {/* Institutional Real-Time Telemetry Bar with Modular View Switcher */}
       <Header
         connected={connected}
         latency={latency}
@@ -296,6 +310,8 @@ export default function App() {
         onToggleFocusMode={() => setFocusMode((f) => !f)}
         alertsCount={alertsCount}
         onCopySnapshot={handleCopySnapshot}
+        activeView={activeView}
+        onSelectView={setActiveView}
       />
 
       {/* Focus Mode Exit Floating Badge */}
@@ -310,7 +326,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Unified Single-Screen Real-Time Command Center */}
+      {/* Main Modular Bento-Box Real-Time Command Center */}
       <main className="terminal-main">
         {/* T-5 Min Red-Folder Event Warning Banner */}
         {showAlertBanner && (
@@ -356,57 +372,82 @@ export default function App() {
           </div>
         )}
 
-        {/* Linear 24H Global Market Session Timeline Bar */}
-        <SessionClock />
+        {/* ─── VIEW 1: THE COMMAND CENTER (Desktop / Mobile Trader) ─── */}
+        {activeView === 'COMMAND_CENTER' && (
+          <>
+            {/* Linear 24H Global Market Session Timeline Bar */}
+            <SessionClock />
 
-        {/* Top Command Grid: Trading Chart Execution (Left) & AI Guidance / SMC / Confluence (Right) */}
-        <div className="grid-terminal-top">
-          {/* Left Column: Primary Execution Workstation */}
-          <div className="terminal-column-left">
-            {/* Interactive TradingView Chart with Integrated Tick Tape, MTF Matrix & Volume Profile */}
-            <TradingChart prices={prices} />
+            {/* Primary Command Grid: Execution Chart & Liquidity/Confluence */}
+            <div className="grid-terminal-top">
+              {/* Left Column: Primary Execution Workstation */}
+              <div className="terminal-column-left">
+                {/* Interactive TradingView Chart with Integrated Tick Tape, MTF Matrix & Volume Profile */}
+                <TradingChart prices={prices} />
 
-            {/* ICT Session Killzones & Real-Time Pearson Correlation Matrix */}
-            <div className="grid-sub-2col">
-              <KillzoneTracker prices={prices} />
-              <CorrelationMatrix prices={prices} />
+                {/* Mobile-Responsive Swipeable Carousel for Analytics */}
+                <MobileAnalyticsCarousel>
+                  <AsianRangeBox prices={prices} />
+                  <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
+                </MobileAnalyticsCarousel>
+
+                {/* ICT Session Killzones & Real-Time Pearson Correlation Matrix */}
+                <div className="grid-sub-2col">
+                  <KillzoneTracker prices={prices} />
+                  <CorrelationMatrix prices={prices} />
+                </div>
+              </div>
+
+              {/* Right Column: AI Guidance, Bias Confluence, Smart Liquidity & Sentiment */}
+              <div className="terminal-column-right">
+                {/* Real-Time Institutional AI Market Guidance & Regimes */}
+                <AIMarketGuidance activeSession={activeSession} prices={prices} calendarData={calendarData} />
+
+                {/* Quantitative Institutional Confluence Bias Meter */}
+                <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
+
+                {/* Smart Liquidity Radar (BSL, SSL, FVG & Mitigations) */}
+                <SmartLiquidityRadar prices={prices} />
+
+                {/* Safe-Haven Gold Fear & Greed Gauge */}
+                <FearGreedGauge prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
+              </div>
             </div>
 
-            {/* Asian Accumulation Range & Post-News Volatility Traps */}
-            <div className="grid-sub-2col">
-              <AsianRangeBox prices={prices} />
-              <VolatilityTrapDetector prices={prices} calendarData={calendarData} />
+            {/* 8-Asset Live Macro Correlation Radar */}
+            <MacroRadar prices={prices} />
+          </>
+        )}
+
+        {/* ─── VIEW 2: THE MACRO VIEW (Economic Calendar, News Wire, COT) ─── */}
+        {activeView === 'MACRO_VIEW' && (
+          <>
+            {/* Linear 24H Global Market Session Timeline Bar */}
+            <SessionClock />
+
+            {/* Bento Grid: Tabular Economic Calendar & COT / Financial Wire */}
+            <div className="macro-view-grid">
+              {/* Left: Tabular Economic Event Calendar with Timezone Switcher */}
+              <EconomicCalendar calendarData={calendarData} />
+
+              {/* Right: COT Institutional Positioning & Breaking News Wire */}
+              <div className="macro-view-sidebar">
+                {/* CFTC Institutional COT Speculator vs Commercial Sentiment */}
+                <COTSentimentGauge cotData={cotData} />
+
+                {/* Real-Time Financial & Macro Wire */}
+                <NewsTerminal newsFeed={newsFeed} />
+              </div>
             </div>
-          </div>
 
-          {/* Right Column: AI Guidance, Bias Confluence, Smart Liquidity & Sentiment */}
-          <div className="terminal-column-right">
-            {/* Real-Time Institutional AI Market Guidance & Regimes */}
-            <AIMarketGuidance activeSession={activeSession} prices={prices} calendarData={calendarData} />
-
-            {/* Quantitative Institutional Confluence Bias Meter */}
-            <ConfluenceMeter prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
-
-            {/* Smart Liquidity Radar (BSL, SSL, FVG & Mitigations) */}
-            <SmartLiquidityRadar prices={prices} />
-
-            {/* Safe-Haven Gold Fear & Greed Gauge */}
-            <FearGreedGauge prices={prices} newsFeed={newsFeed} calendarData={calendarData} cotData={cotData} />
-
-            {/* CFTC Institutional COT Speculator vs Commercial Sentiment */}
-            <COTSentimentGauge cotData={cotData} />
-          </div>
-        </div>
-
-        {/* Middle Section: 8-Asset Live Macro Correlation Radar */}
-        <MacroRadar prices={prices} />
-
-        {/* Bottom Grid: Real-Time Economic Calendar (with Timezone Switcher) & Breaking News Wire */}
-        <div className="grid-terminal-events-news">
-          <EconomicCalendar calendarData={calendarData} />
-          <NewsTerminal newsFeed={newsFeed} />
-        </div>
+            {/* 8-Asset Live Macro Correlation Radar */}
+            <MacroRadar prices={prices} />
+          </>
+        )}
       </main>
+
+      {/* Sticky Mobile Trader Execution Dock (Frozen on Mobile Screens) */}
+      <MobileTraderDock prices={prices} />
 
       {/* Bottom Status Bar (Bloomberg Terminal Style) */}
       <StatusBar
